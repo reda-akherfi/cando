@@ -33,9 +33,11 @@ from app.ui.project_list_widget import ProjectListWidget
 from app.ui.task_dialog import TaskDialog
 from app.ui.task_list_widget import TaskListWidget
 from app.ui.tag_list_widget import TagListWidget
+from app.ui.timer_widget import TimerWidget
 from app.ui.ui_main import UiMainWindow
 from app.models.project import Project
 from app.models.task import Task
+from app.models.timer import Timer
 from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.controllers.timer_controller import TimerController
@@ -259,20 +261,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.task_list_widget)
 
     def setup_timer_tab(self):
-        """Set up the timer tab with timer controls."""
+        """Set up the timer tab with comprehensive timer widget."""
         layout = QVBoxLayout(self.timer_tab)
 
-        # Add timer controls
-        layout.addWidget(self.ui.start_button)
-        layout.addWidget(self.ui.stop_button)
+        # Create and add the comprehensive timer widget
+        self.timer_widget = TimerWidget(self.timer_controller, self.db_service)
+        layout.addWidget(self.timer_widget)
 
-        # Connect buttons to timer controller
-        self.ui.start_button.clicked.connect(self.start_timer)
-        self.ui.stop_button.clicked.connect(self.stop_timer)
-
-        # Add timer status label
-        self.timer_status_label = QLabel("No active timer")
-        layout.addWidget(self.timer_status_label)
+        # Connect timer widget signals
+        self.timer_widget.timer_started.connect(self.on_timer_started)
+        self.timer_widget.timer_stopped.connect(self.on_timer_stopped)
+        self.timer_widget.timer_completed.connect(self.on_timer_completed)
 
     def setup_settings_tab(self):
         """Set up the settings tab for application configuration."""
@@ -576,23 +575,31 @@ class MainWindow(QMainWindow):
                 self, "Success", f"Project '{project.name}' deleted successfully!"
             )
 
+    def on_timer_started(self, timer: Timer):
+        """Handle timer started event."""
+        self.refresh_charts()
+
+    def on_timer_stopped(self, timer: Timer):
+        """Handle timer stopped event."""
+        self.refresh_charts()
+
+    def on_timer_completed(self, timer: Timer):
+        """Handle timer completed event."""
+        self.refresh_charts()
+
     def start_timer(self):
         """Start a timer for the first available task."""
         tasks = self.db_service.get_tasks()
         if tasks:
             # Start timer for the first task (in a real app, you'd let user select)
             timer = self.timer_controller.start_timer(tasks[0].id, "stopwatch")
-            self.timer_status_label.setText(f"Timer started for: {tasks[0].name}")
             self.refresh_charts()
 
     def stop_timer(self):
         """Stop the current timer."""
         timer = self.timer_controller.stop_timer()
         if timer:
-            self.timer_status_label.setText("Timer stopped")
             self.refresh_charts()
-        else:
-            self.timer_status_label.setText("No active timer to stop")
 
     def add_task(self):
         """Add a new task."""
@@ -674,10 +681,9 @@ class MainWindow(QMainWindow):
 
     def on_task_selected(self, task: Task):
         """Handle task selection."""
-        # This method is not strictly needed for the current implementation
-        # as the task_list_widget handles selection internally.
-        # However, it can be used if specific actions are needed on task selection.
-        pass
+        # Set the selected task in the timer widget
+        if hasattr(self, "timer_widget"):
+            self.timer_widget.set_current_task(task)
 
     def add_sample_task(self):
         """Add a sample task for testing."""

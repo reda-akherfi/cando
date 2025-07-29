@@ -46,7 +46,7 @@ class TimerController:
         # Create new timer in database
         start_time = datetime.now()
         db_timer = self.db_service.create_timer(
-            task_id=task_id, start=start_time, timer_type=timer_type
+            task_id=task_id, start=start_time, type=timer_type
         )
 
         self.active_timer_id = db_timer.id
@@ -126,6 +126,19 @@ class TimerController:
             List of timer objects for the task
         """
         db_timers = self.db_service.get_timers(task_id=task_id)
+        return [
+            Timer(id=t.id, task_id=t.task_id, start=t.start, end=t.end, type=t.type)
+            for t in db_timers
+        ]
+
+    def get_all_timers(self) -> list[Timer]:
+        """
+        Get all timers from the database.
+
+        Returns:
+            List of all timer objects
+        """
+        db_timers = self.db_service.get_timers()
         return [
             Timer(id=t.id, task_id=t.task_id, start=t.start, end=t.end, type=t.type)
             for t in db_timers
