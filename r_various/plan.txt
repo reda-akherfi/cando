@@ -1,0 +1,127 @@
+PROJECT: Cando – Productivity Desktop App
+
+SUMMARY:
+Cando is a Python-based cross-platform desktop application using PySide6. It organizes work via Projects, Tasks, Tags, and Timers. The design is modular and AI-agent-friendly. One key feature is data visualization to support time analysis and productivity insights.
+
+MODULES:
+- app/
+  - main.py: Launches the application. ✅ IMPLEMENTED
+  - ui/: Contains layout code from Qt Designer (or manually written). ✅ IMPLEMENTED
+  - views/: Manages the visual interface (widgets, windows). ✅ IMPLEMENTED
+  - models/: Defines core data entities using @dataclass. ✅ IMPLEMENTED
+  - controllers/: Encapsulates app logic (e.g. timer tracking). ✅ IMPLEMENTED
+  - services/: Intended for analytics, persistence, reminders. ✅ FULLY IMPLEMENTED
+  - utils/: General helpers (e.g. mock data, formatting). ✅ IMPLEMENTED
+
+ENTITIES:
+1. Project:
+   - id, name, description, task list (by ID) ✅ IMPLEMENTED
+2. Task:
+   - id, project_id, name, due_date, completed ✅ IMPLEMENTED
+3. Tag:
+   - id, name, linked_type ("project" or "task"), linked_id ✅ IMPLEMENTED
+4. Timer:
+   - id, task_id, start, end, type ("maduro", "countdown", "stopwatch") ✅ IMPLEMENTED
+
+TIMER DESIGN:
+- A new Timer instance is created for every uninterrupted task period. ✅ IMPLEMENTED
+- Switching tasks ends the current timer and starts a new one, even if the same UI timer is shown. ✅ IMPLEMENTED
+- This allows accurate backend logging and seamless frontend UX. ✅ IMPLEMENTED
+
+VISUALIZATION SYSTEM:
+- Built using matplotlib embedded in PySide6 widgets. ✅ IMPLEMENTED
+- All charts will be placed in dedicated tabs or panels. ✅ IMPLEMENTED
+- Visualizations planned:
+  - Time spent per tag ✅ IMPLEMENTED (analytics service)
+  - Time spent per project ✅ IMPLEMENTED (analytics service + chart widget)
+  - Daily, weekly, and monthly productivity trends ✅ IMPLEMENTED (analytics service + chart widget)
+  - Timer type usage statistics ✅ IMPLEMENTED (analytics service + chart widget)
+- Visual components are separated from logic and data. ✅ IMPLEMENTED
+- Visualization widgets consume raw data from `services.analytics` (planned). ✅ IMPLEMENTED
+- Charts are dynamically updated when data changes. ✅ IMPLEMENTED
+
+UI:
+- PySide6 QMainWindow ✅ IMPLEMENTED
+- Main window currently shows label and buttons ✅ IMPLEMENTED
+- To be expanded with tabbed views: ✅ IMPLEMENTED
+  - Dashboard (charts) ✅ IMPLEMENTED (with real data and charts)
+  - Projects and tasks ✅ IMPLEMENTED (with CRUD functionality)
+  - Timer controls ✅ IMPLEMENTED (with database persistence)
+  - Settings ✅ IMPLEMENTED (with data management)
+
+AI INTEGRATION GUIDELINES:
+- Logic and data are fully decoupled from the UI. ✅ IMPLEMENTED
+- All model classes are plain dataclasses. ✅ IMPLEMENTED
+- All logic is grouped in `controllers/` and `services/`, designed for testability and predictability. ✅ IMPLEMENTED
+- UI handles only display and input. ✅ IMPLEMENTED
+- Ideal structure for LLM agent-based coding or testing. ✅ IMPLEMENTED
+
+CURRENT IMPLEMENTATION STATUS:
+✅ COMPLETED:
+- Basic application structure and architecture
+- All data models (Project, Task, Tag, Timer)
+- Timer controller with start/stop functionality
+- Tabbed main window interface
+- Analytics service with data analysis methods
+- Chart widgets for data visualization
+- Mock data generation
+- Proper documentation and docstrings
+- Pylint configuration for Qt compatibility
+- SQLite database with SQLAlchemy ORM ✅ NEW
+- Complete CRUD operations for all entities ✅ NEW
+- Data persistence layer ✅ NEW
+- Real-time chart updates with database data ✅ NEW
+- Sample data initialization ✅ NEW
+- Database management in Settings tab ✅ NEW
+
+🔄 IN PROGRESS:
+- Enhanced UI for better user experience
+- More sophisticated timer interface
+
+❌ TODO:
+- Add full timer interface with multiple views (maduro, countdown, stopwatch)
+- Improve dashboard UI and themes
+- Add data export functionality
+- Implement keyboard shortcuts
+- Add system tray integration
+- Add notifications
+- Add data backup/restore
+- Add theme support
+- Add data import functionality
+- Add multi-language support
+
+ENHANCEMENT SUGGESTIONS:
+1. **Enhanced Timer Interface**: Add dedicated timer types with specific UI for each
+2. **Real-time Updates**: Add signal/slot mechanism for live chart updates
+3. **Export Functionality**: Add CSV/PDF export for productivity reports
+4. **Keyboard Shortcuts**: Implement global hotkeys for timer control
+5. **System Tray**: Add system tray icon with quick timer access
+6. **Data Backup**: Implement automatic backup and restore functionality
+7. **Themes**: Add dark/light theme support
+8. **Notifications**: Add desktop notifications for timer events
+9. **Data Import**: Support importing data from other productivity tools
+10. **Multi-language**: Add internationalization support
+
+DATABASE IMPLEMENTATION:
+✅ COMPLETED:
+- SQLite database with SQLAlchemy ORM
+- Complete database models with relationships
+- CRUD operations for all entities
+- Data adapters for model conversion
+- Database service with session management
+- Sample data initialization
+- Database management utilities
+
+ENVIRONMENT:
+- Python 3.11.9 (Windows 11)
+- PySide6==6.6.3
+- Other dependencies: matplotlib, pandas, sqlalchemy ✅ VERIFIED
+- Entry point: `python run.py` ✅ IMPLEMENTED
+
+DEVELOPMENT NOTES:
+- Pylint configuration optimized for Qt development
+- All modules include proper docstrings
+- Code follows PEP 8 standards with Qt-specific exceptions
+- Modular architecture supports easy testing and AI-assisted development
+- Database file: `cando.db` (SQLite)
+- Sample data automatically initialized on first run

@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
 
 
-class Ui_MainWindow:
+class UiMainWindow:
     def setupUi(self, MainWindow):
         MainWindow.setWindowTitle("Cando")
         MainWindow.resize(800, 600)
