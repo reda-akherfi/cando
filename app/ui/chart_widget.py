@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PySide6.QtWidgets import QWidget, QVBoxLayout
+from app.ui.theme import DarkTheme
 
 
 class ChartWidget(QWidget):
@@ -22,9 +23,15 @@ class ChartWidget(QWidget):
     def __init__(self, parent=None):
         """Initialize the chart widget with matplotlib figure."""
         super().__init__(parent)
-        self.figure = Figure(figsize=(8, 6))
+        self.colors = DarkTheme.get_chart_colors()
+
+        # Create figure with dark theme
+        self.figure = Figure(figsize=(8, 6), facecolor=self.colors["background"])
         self.canvas = FigureCanvas(self.figure)
-        self.axes = self.figure.add_subplot(111)
+        self.axes = self.figure.add_subplot(111, facecolor=self.colors["background"])
+
+        # Apply dark theme to the axes
+        self.axes.set_facecolor(self.colors["background"])
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.canvas)
@@ -33,6 +40,7 @@ class ChartWidget(QWidget):
     def clear(self):
         """Clear the current chart."""
         self.axes.clear()
+        self.axes.set_facecolor(self.colors["background"])
 
     def update_chart(self):
         """Update the chart display."""
@@ -59,6 +67,8 @@ class TimeByProjectChart(ChartWidget):
                 ha="center",
                 va="center",
                 transform=self.axes.transAxes,
+                color=self.colors["text"],
+                fontsize=12,
             )
             self.update_chart()
             return
@@ -66,11 +76,20 @@ class TimeByProjectChart(ChartWidget):
         projects = list(project_times.keys())
         hours = list(project_times.values())
 
-        bars = self.axes.bar(projects, hours, color="skyblue", alpha=0.7)
-        self.axes.set_title("Time Spent by Project")
-        self.axes.set_xlabel("Projects")
-        self.axes.set_ylabel("Hours")
-        self.axes.tick_params(axis="x", rotation=45)
+        bars = self.axes.bar(projects, hours, color=self.colors["primary"], alpha=0.7)
+        self.axes.set_title(
+            "Time Spent by Project",
+            color=self.colors["text"],
+            fontsize=14,
+            fontweight="bold",
+        )
+        self.axes.set_xlabel("Projects", color=self.colors["text"], fontsize=12)
+        self.axes.set_ylabel("Hours", color=self.colors["text"], fontsize=12)
+        self.axes.tick_params(axis="x", rotation=45, colors=self.colors["text"])
+        self.axes.tick_params(axis="y", colors=self.colors["text"])
+
+        # Set grid
+        self.axes.grid(True, alpha=0.3, color=self.colors["grid"])
 
         # Add value labels on bars
         for bar, hour in zip(bars, hours):
@@ -81,6 +100,8 @@ class TimeByProjectChart(ChartWidget):
                 f"{hour:.1f}h",
                 ha="center",
                 va="bottom",
+                color=self.colors["text"],
+                fontweight="bold",
             )
 
         self.figure.tight_layout()
@@ -107,6 +128,8 @@ class DailyProductivityChart(ChartWidget):
                 ha="center",
                 va="center",
                 transform=self.axes.transAxes,
+                color=self.colors["text"],
+                fontsize=12,
             )
             self.update_chart()
             return
@@ -114,12 +137,25 @@ class DailyProductivityChart(ChartWidget):
         dates = list(daily_hours.keys())
         hours = list(daily_hours.values())
 
-        self.axes.plot(dates, hours, marker="o", linewidth=2, markersize=6)
-        self.axes.set_title("Daily Productivity")
-        self.axes.set_xlabel("Date")
-        self.axes.set_ylabel("Hours Worked")
-        self.axes.tick_params(axis="x", rotation=45)
-        self.axes.grid(True, alpha=0.3)
+        self.axes.plot(
+            dates,
+            hours,
+            marker="o",
+            linewidth=2,
+            markersize=6,
+            color=self.colors["primary"],
+        )
+        self.axes.set_title(
+            "Daily Productivity",
+            color=self.colors["text"],
+            fontsize=14,
+            fontweight="bold",
+        )
+        self.axes.set_xlabel("Date", color=self.colors["text"], fontsize=12)
+        self.axes.set_ylabel("Hours Worked", color=self.colors["text"], fontsize=12)
+        self.axes.tick_params(axis="x", rotation=45, colors=self.colors["text"])
+        self.axes.tick_params(axis="y", colors=self.colors["text"])
+        self.axes.grid(True, alpha=0.3, color=self.colors["grid"])
 
         # Add value labels on points
         for date, hour in zip(dates, hours):
@@ -129,6 +165,8 @@ class DailyProductivityChart(ChartWidget):
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
+                color=self.colors["text"],
+                fontweight="bold",
             )
 
         self.figure.tight_layout()
@@ -155,18 +193,40 @@ class TimerTypeChart(ChartWidget):
                 ha="center",
                 va="center",
                 transform=self.axes.transAxes,
+                color=self.colors["text"],
+                fontsize=12,
             )
             self.update_chart()
             return
 
         types = list(type_stats.keys())
         counts = list(type_stats.values())
-        colors = ["lightcoral", "lightblue", "lightgreen", "gold", "lightpink"]
+        colors = [
+            self.colors["primary"],
+            self.colors["secondary"],
+            self.colors["success"],
+            self.colors["warning"],
+            self.colors["error"],
+        ]
 
         wedges, texts, autotexts = self.axes.pie(
             counts, labels=types, autopct="%1.1f%%", colors=colors
         )
-        self.axes.set_title("Timer Type Usage")
+        self.axes.set_title(
+            "Timer Type Usage",
+            color=self.colors["text"],
+            fontsize=14,
+            fontweight="bold",
+        )
+
+        # Style the text elements
+        for text in texts:
+            text.set_color(self.colors["text"])
+            text.set_fontsize(10)
+
+        for autotext in autotexts:
+            autotext.set_color(self.colors["text"])
+            autotext.set_fontweight("bold")
 
         self.figure.tight_layout()
         self.update_chart()

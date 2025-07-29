@@ -12,6 +12,7 @@ from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.services.data_init import DataInitializer
 from app.controllers.timer_controller import TimerController
+from app.ui.theme import DarkTheme
 
 
 def main():
@@ -22,6 +23,9 @@ def main():
     and starts the event loop.
     """
     app = QApplication(sys.argv)
+
+    # Apply dark theme to the entire application
+    DarkTheme.apply_to_application(app)
 
     # Initialize database and services
     db_service = DatabaseService()

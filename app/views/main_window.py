@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QListWidget,
     QListWidgetItem,
+    QApplication,
 )
 from app.ui.ui_main import UiMainWindow
 from app.ui.chart_widget import (
@@ -25,6 +26,7 @@ from app.ui.chart_widget import (
 from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.controllers.timer_controller import TimerController
+from app.ui.theme import DarkTheme
 
 
 class MainWindow(QMainWindow):
@@ -52,6 +54,7 @@ class MainWindow(QMainWindow):
         self.db_service = db_service
         self.analytics_service = analytics_service
         self.timer_controller = timer_controller
+        self.is_dark_theme = True  # Track current theme
 
         self.ui = UiMainWindow()
         self.ui.setupUi(self)
@@ -153,6 +156,15 @@ class MainWindow(QMainWindow):
         """Set up the settings tab for application configuration."""
         layout = QVBoxLayout(self.settings_tab)
 
+        # Add theme toggle
+        theme_layout = QHBoxLayout()
+        theme_label = QLabel("Theme:")
+        self.theme_button = QPushButton("Switch to Light Mode")
+        self.theme_button.clicked.connect(self.toggle_theme)
+        theme_layout.addWidget(theme_label)
+        theme_layout.addWidget(self.theme_button)
+        theme_layout.addStretch()
+
         # Add settings controls
         clear_data_btn = QPushButton("Clear All Data")
         clear_data_btn.clicked.connect(self.clear_all_data)
@@ -160,9 +172,32 @@ class MainWindow(QMainWindow):
         reset_data_btn = QPushButton("Reset to Sample Data")
         reset_data_btn.clicked.connect(self.reset_to_sample_data)
 
+        # Add widgets to layout
+        layout.addWidget(QLabel("Appearance"))
+        layout.addLayout(theme_layout)
         layout.addWidget(QLabel("Database Settings"))
         layout.addWidget(clear_data_btn)
         layout.addWidget(reset_data_btn)
+        layout.addStretch()
+
+    def toggle_theme(self):
+        """Toggle between light and dark themes."""
+        app = QApplication.instance()
+
+        if self.is_dark_theme:
+            # Switch to light theme (reset to default)
+            app.setPalette(app.style().standardPalette())
+            app.setStyleSheet("")
+            self.theme_button.setText("Switch to Dark Mode")
+            self.is_dark_theme = False
+        else:
+            # Switch to dark theme
+            DarkTheme.apply_to_application(app)
+            self.theme_button.setText("Switch to Light Mode")
+            self.is_dark_theme = True
+
+        # Refresh charts to update their appearance
+        self.refresh_charts()
 
     def refresh_data(self):
         """Refresh all data displays."""
