@@ -1,0 +1,13 @@
+{
+    "python.pythonPath": ".venv-cando\\Scripts\\python.exe",
+    "python.terminal.activateEnvironment": true,
+    "python.linting.enabled": true,
+    "editor.formatOnSave": true,
+    "editor.renderWhitespace": "all",
+    "files.autoSave": "afterDelay",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=120"
+    ],
+}

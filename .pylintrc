@@ -1,0 +1,54 @@
+[MASTER]
+# Add the current directory to the Python path
+init-hook='import sys; sys.path.append(".")'
+
+# Use multiple processes to speed up Pylint
+jobs=0
+
+[MESSAGES CONTROL]
+# Disable warnings that are common in GUI applications or Qt-specific
+disable=R0903,W0621,E0611,C0103,W0201
+
+[REPORTS]
+# Set the output format
+output-format=text
+
+# Include a brief explanation of the error
+msg-template={path}:{line}: [{msg_id}({symbol}), {obj}] {msg}
+
+[BASIC]
+# Regular expression which should only match function or class names
+good-names=i,j,k,ex,Run,_
+
+# Regular expression which should only match correct variable names
+good-names-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Regular expression which should only match correct variable names
+bad-names-rgx=^[A-Z_][A-Z0-9_]*$
+
+# Regular expression which should only match correct variable names
+name-group=
+
+# List of decorators that produce context managers
+contextmanager-decorators=contextlib.contextmanager
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=100
+
+# Maximum number of lines in a module
+max-module-lines=1000
+
+# String used as indentation unit
+indent-string='    '
+
+[SIMILARITIES]
+# Minimum lines number of a similarity
+min-similarity-lines=4
+
+# Ignore imports when computing similarities
+ignore-imports=yes
+
+[MISCELLANEOUS]
+# List of note tags to take into consideration
+notes=
