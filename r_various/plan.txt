@@ -47,6 +47,14 @@
 - ✅ Task list widget with rich display
 - ✅ Task context menu for edit/delete/toggle completion
 - ✅ Task creation tied to selected project
+- ✅ **Fuzzy search functionality for tasks within projects**
+  - Search across task names, descriptions, and tags
+  - Relevance-based sorting (most to least relevant)
+  - Search term highlighting in results
+  - Keyboard shortcuts (Ctrl+Shift+F to focus, Escape to clear)
+  - Search results counter
+  - Clear search button
+  - Search enabled only when project is selected
 
 ### Tag System
 - ✅ Reusable tag system across projects and tasks
@@ -95,6 +103,12 @@
   - Added real-time search with highlighting
   - Integrated keyboard shortcuts and search controls
   - Added search results counter and clear functionality
+- ✅ **Implemented fuzzy search functionality for tasks within projects**
+  - Added task search with same features as project search
+  - Search enabled only when project is selected
+  - Keyboard shortcuts (Ctrl+Shift+F for task search)
+  - Search highlighting for task names and descriptions
+  - Automatic search clearing when switching projects
 
 ## 🚀 CURRENT STATUS
 The application is now fully functional with:

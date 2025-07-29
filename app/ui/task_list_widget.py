@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor, QPalette
 from app.models.task import Task
+from app.utils.fuzzy_search import highlight_search_terms
 
 
 class TaskItemWidget(QWidget):
@@ -32,10 +33,11 @@ class TaskItemWidget(QWidget):
     with color coding and visual indicators.
     """
 
-    def __init__(self, task: Task, parent=None):
+    def __init__(self, task: Task, search_query: str = "", parent=None):
         """Initialize the task item widget."""
         super().__init__(parent)
         self.task = task
+        self.search_query = search_query
         self.setup_ui()
 
     def setup_ui(self):
@@ -50,19 +52,31 @@ class TaskItemWidget(QWidget):
         # Task name and description
         info_layout = QVBoxLayout()
 
-        name_label = QLabel(self.task.name)
+        # Highlight search terms in task name
+        name_text = self.task.name
+        if self.search_query:
+            name_text = highlight_search_terms(name_text, self.search_query)
+
+        name_label = QLabel(name_text)
         name_label.setFont(QFont("Arial", 10, QFont.Bold))
         name_label.setStyleSheet(f"color: {self.get_text_color()};")
+        name_label.setTextFormat(Qt.RichText)
         info_layout.addWidget(name_label)
 
         if self.task.description:
-            desc_label = QLabel(
-                self.task.description[:80] + "..."
-                if len(self.task.description) > 80
+            # Highlight search terms in description
+            desc_text = (
+                self.task.description[:100] + "..."
+                if len(self.task.description) > 100
                 else self.task.description
             )
+            if self.search_query:
+                desc_text = highlight_search_terms(desc_text, self.search_query)
+
+            desc_label = QLabel(desc_text)
             desc_label.setFont(QFont("Arial", 8))
             desc_label.setStyleSheet("color: #888888;")
+            desc_label.setTextFormat(Qt.RichText)
             info_layout.addWidget(desc_label)
 
         main_layout.addLayout(info_layout)
@@ -173,22 +187,20 @@ class TaskListWidget(QListWidget):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
 
-    def add_task(self, task: Task):
+    def add_task(self, task: Task, search_query: str = ""):
         """Add a task to the list."""
         item = QListWidgetItem(self)
-        item_widget = TaskItemWidget(task)
+        item_widget = TaskItemWidget(task, search_query)
         item.setSizeHint(item_widget.sizeHint())
         self.addItem(item)
         self.setItemWidget(item, item_widget)
-
-        # Store task reference in item data
         item.setData(Qt.UserRole, task)
 
-    def update_tasks(self, tasks: List[Task]):
+    def update_tasks(self, tasks: List[Task], search_query: str = ""):
         """Update the list with new tasks."""
         self.clear()
         for task in tasks:
-            self.add_task(task)
+            self.add_task(task, search_query)
 
     def get_selected_task(self) -> Optional[Task]:
         """Get the currently selected task."""

@@ -195,6 +195,44 @@ class MainWindow(QMainWindow):
         task_section_label.setFont(QFont("Arial", 12, QFont.Bold))
         layout.addWidget(task_section_label)
 
+        # Task search functionality
+        task_search_layout = QHBoxLayout()
+        task_search_label = QLabel("Search Tasks:")
+        self.task_search_input = QLineEdit()
+        self.task_search_input.setPlaceholderText(
+            "Search tasks by name, description, or tags... (Ctrl+Shift+F)"
+        )
+        self.task_search_input.textChanged.connect(self.on_task_search_text_changed)
+        self.task_search_input.setMinimumWidth(300)
+        self.task_search_input.setEnabled(False)  # Disabled until project is selected
+
+        # Add keyboard shortcuts for task search
+        task_search_shortcut = QShortcut(QKeySequence("Ctrl+Shift+F"), self)
+        task_search_shortcut.activated.connect(self.focus_task_search)
+
+        # Add Escape key to clear task search
+        task_escape_shortcut = QShortcut(QKeySequence("Escape"), self.task_search_input)
+        task_escape_shortcut.activated.connect(self.clear_task_search)
+
+        # Add clear button for task search
+        self.clear_task_search_btn = QPushButton("Clear")
+        self.clear_task_search_btn.clicked.connect(self.clear_task_search)
+        self.clear_task_search_btn.setMaximumWidth(60)
+        self.clear_task_search_btn.setEnabled(
+            False
+        )  # Disabled until project is selected
+
+        task_search_layout.addWidget(task_search_label)
+        task_search_layout.addWidget(self.task_search_input)
+        task_search_layout.addWidget(self.clear_task_search_btn)
+        task_search_layout.addStretch()
+        layout.addLayout(task_search_layout)
+
+        # Task search results counter
+        self.task_search_results_label = QLabel("")
+        self.task_search_results_label.setStyleSheet("color: #888; font-size: 11px;")
+        layout.addWidget(self.task_search_results_label)
+
         # Task controls
         task_controls_layout = QHBoxLayout()
         self.add_task_btn = QPushButton("Add Task")
@@ -342,12 +380,53 @@ class MainWindow(QMainWindow):
         """Handle project selection."""
         self.current_project_id = project.id
         self.refresh_task_list(project.id)
+        self.task_search_input.setEnabled(True)  # Enable task search input
+        self.clear_task_search_btn.setEnabled(True)  # Enable clear task search button
+        # Clear task search when switching projects
+        self.task_search_input.clear()
+        self.task_search_results_label.setText("")
 
     def refresh_task_list(self, project_id: int):
         """Refresh the task list for a selected project."""
-        tasks = self.db_service.get_tasks(project_id=project_id)
-        self.task_list_widget.update_tasks(tasks)
+        search_text = self.task_search_input.text().strip()
+
+        # Get all tasks for the project
+        all_tasks = self.db_service.get_tasks(project_id=project_id)
+
+        # Apply fuzzy search if there's a search query
+        if search_text:
+            search_fields = ["name", "description"]
+            search_results = fuzzy_search(
+                search_text, all_tasks, search_fields, threshold=0.2
+            )
+            tasks = [item for item, score in search_results]
+            self.task_search_results_label.setText(
+                f"Showing {len(tasks)} of {len(all_tasks)} tasks"
+            )
+        else:
+            tasks = all_tasks
+            self.task_search_results_label.setText(
+                f"Showing {len(tasks)} of {len(all_tasks)} tasks"
+            )
+
+        self.task_list_widget.update_tasks(tasks, search_text)
         self.add_task_btn.setEnabled(True)
+
+    def on_task_search_text_changed(self):
+        """Handle task search text changes."""
+        if hasattr(self, "current_project_id") and self.current_project_id:
+            self.refresh_task_list(self.current_project_id)
+
+    def focus_task_search(self):
+        """Focus the task search input field."""
+        if hasattr(self, "current_project_id") and self.current_project_id:
+            self.task_search_input.setFocus()
+
+    def clear_task_search(self):
+        """Clear the task search input field."""
+        self.task_search_input.clear()
+        if hasattr(self, "current_project_id") and self.current_project_id:
+            self.refresh_task_list(self.current_project_id)
 
     def add_project(self):
         """Add a new project."""
