@@ -25,6 +25,7 @@ class Task:
     description: str = ""
     completed: bool = False
     due_date: Optional[datetime] = None
+    estimated_hours: Optional[float] = None
     priority: str = "medium"  # low, medium, high, urgent
     tags: List[str] = field(default_factory=list)
     created_at: Optional[datetime] = None

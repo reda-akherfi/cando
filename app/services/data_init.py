@@ -120,59 +120,73 @@ class DataInitializer:
 
     def create_sample_tasks(self, project):
         """Create sample tasks for a project."""
-        if "Website Redesign" in project.name:
+        # Define tasks based on project name
+        if "Website" in project.name:
             tasks = [
-                ("Design Mockups", "Create wireframes and visual mockups", 8),
-                ("Frontend Development", "Implement responsive UI components", 24),
-                ("Backend Integration", "Connect frontend with API endpoints", 16),
-                ("Testing & QA", "Comprehensive testing and bug fixes", 12),
-                ("Deployment", "Deploy to production environment", 4),
+                (
+                    "Design Homepage",
+                    "Create wireframes and mockups for the homepage",
+                    8,
+                ),
+                ("Implement Navigation", "Build responsive navigation menu", 4),
+                (
+                    "Add Contact Form",
+                    "Create and style contact form with validation",
+                    6,
+                ),
+                ("Optimize Performance", "Optimize images and implement caching", 5),
             ]
-        elif "Mobile App Development" in project.name:
+        elif "Mobile App" in project.name:
             tasks = [
-                ("Project Setup", "Initialize React Native project", 4),
-                ("UI Components", "Build reusable UI components", 20),
-                ("Navigation", "Implement app navigation", 12),
-                ("API Integration", "Connect with backend services", 24),
-                ("Testing", "Unit and integration testing", 16),
-                ("App Store Prep", "Prepare for app store submission", 8),
+                ("Setup Development Environment", "Install SDK and configure tools", 3),
+                ("Design UI Components", "Create reusable UI components", 10),
+                ("Implement Authentication", "Add user login and registration", 8),
+                ("Add Push Notifications", "Configure push notification system", 6),
             ]
-        elif "Database Migration" in project.name:
+        elif "Database" in project.name:
             tasks = [
-                ("Backup Creation", "Create full database backup", 2),
-                ("Schema Migration", "Migrate database schema", 16),
-                ("Data Migration", "Transfer data to new system", 12),
-                ("Testing", "Verify data integrity", 8),
-                ("Rollback Plan", "Prepare rollback procedures", 2),
+                ("Design Schema", "Create database schema and relationships", 6),
+                (
+                    "Implement CRUD Operations",
+                    "Build create, read, update, delete functions",
+                    8,
+                ),
+                (
+                    "Add Data Validation",
+                    "Implement input validation and constraints",
+                    4,
+                ),
+                ("Create Backup System", "Setup automated backup procedures", 3),
             ]
-        elif "API Documentation" in project.name:
+        elif "API" in project.name:
             tasks = [
-                ("Endpoint Documentation", "Document all API endpoints", 8),
-                ("Code Examples", "Create usage examples", 4),
-                ("Integration Guide", "Write integration tutorials", 4),
+                ("Define Endpoints", "Design REST API endpoints", 5),
+                ("Implement Authentication", "Add JWT token authentication", 7),
+                ("Add Rate Limiting", "Implement API rate limiting", 4),
+                ("Write Documentation", "Create comprehensive API documentation", 6),
             ]
-        elif "Automated Testing Framework" in project.name:
+        elif "Marketing" in project.name:
             tasks = [
-                ("Framework Setup", "Set up testing infrastructure", 8),
-                ("Unit Tests", "Write unit tests for core modules", 20),
-                ("Integration Tests", "Create integration test suites", 16),
-                ("CI/CD Integration", "Integrate with CI/CD pipeline", 8),
-                ("Test Documentation", "Document testing procedures", 8),
+                (
+                    "Research Competitors",
+                    "Analyze competitor strategies and positioning",
+                    4,
+                ),
+                ("Create Content Calendar", "Plan content strategy and schedule", 3),
+                (
+                    "Design Campaign Materials",
+                    "Create graphics and copy for campaigns",
+                    8,
+                ),
+                ("Setup Analytics", "Configure tracking and reporting tools", 5),
             ]
-        elif "Security Audit" in project.name:
+        else:  # Default tasks for other projects
             tasks = [
-                ("Vulnerability Scan", "Run automated security scans", 4),
-                ("Code Review", "Manual security code review", 12),
-                ("Penetration Testing", "Conduct penetration tests", 6),
-                ("Report Generation", "Create security audit report", 2),
-            ]
-        else:
-            # Generic tasks for any project
-            tasks = [
-                ("Planning", "Project planning and requirements", 4),
-                ("Development", "Core development work", 16),
-                ("Testing", "Testing and quality assurance", 8),
-                ("Deployment", "Deploy to production", 4),
+                ("Project Planning", "Define scope, timeline, and deliverables", 4),
+                ("Requirements Gathering", "Collect and document requirements", 6),
+                ("Implementation", "Build the core functionality", 12),
+                ("Testing", "Test and validate the implementation", 5),
+                ("Deployment", "Deploy to production environment", 3),
             ]
 
         for task_name, task_desc, hours in tasks:
@@ -183,10 +197,28 @@ class DataInitializer:
                 description=task_desc,
                 due_date=due_date,
                 priority="medium",
+                estimated_hours=hours,
             )
 
-            # Note: Task tags are not implemented yet, so we skip adding tags to tasks
-            # In the future, we could add: self.db_service.add_task_tag(task.id, "tag_name")
+            # Add tags to tasks based on project type
+            if "Website" in project.name:
+                self.db_service.add_task_tag(task.id, "frontend")
+                self.db_service.add_task_tag(task.id, "web")
+            elif "Mobile App" in project.name:
+                self.db_service.add_task_tag(task.id, "mobile")
+                self.db_service.add_task_tag(task.id, "app")
+            elif "Database" in project.name:
+                self.db_service.add_task_tag(task.id, "backend")
+                self.db_service.add_task_tag(task.id, "database")
+            elif "API" in project.name:
+                self.db_service.add_task_tag(task.id, "backend")
+                self.db_service.add_task_tag(task.id, "api")
+            elif "Marketing" in project.name:
+                self.db_service.add_task_tag(task.id, "marketing")
+                self.db_service.add_task_tag(task.id, "content")
+            else:
+                self.db_service.add_task_tag(task.id, "general")
+                self.db_service.add_task_tag(task.id, "planning")
 
     def create_sample_timers(self):
         """Create sample timer data."""

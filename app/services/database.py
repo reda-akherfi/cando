@@ -64,6 +64,7 @@ class TaskModel(Base):
     description = Column(Text, nullable=True)
     completed = Column(Boolean, default=False)
     due_date = Column(DateTime, nullable=True)
+    estimated_hours = Column(Float, nullable=True)
     priority = Column(String(20), default="medium")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -216,7 +217,7 @@ class DatabaseService:
             if not project:
                 return False
 
-            # Check if tag already exists
+            # Check if tag already exists for this project
             existing_tag = (
                 session.query(TagModel)
                 .filter(
@@ -228,12 +229,40 @@ class DatabaseService:
             )
 
             if existing_tag:
-                return False  # Tag already exists
+                return False  # Tag already exists for this project
 
             # Create new tag
             new_tag = TagModel(
                 name=tag_name, linked_type="project", linked_id=project_id
             )
+            session.add(new_tag)
+            session.commit()
+            return True
+
+    def add_task_tag(self, task_id: int, tag_name: str) -> bool:
+        """Add a tag to a task."""
+        with self.get_session() as session:
+            # Check if task exists
+            task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
+            if not task:
+                return False
+
+            # Check if tag already exists for this task
+            existing_tag = (
+                session.query(TagModel)
+                .filter(
+                    TagModel.name == tag_name,
+                    TagModel.linked_type == "task",
+                    TagModel.linked_id == task_id,
+                )
+                .first()
+            )
+
+            if existing_tag:
+                return False  # Tag already exists for this task
+
+            # Create new tag
+            new_tag = TagModel(name=tag_name, linked_type="task", linked_id=task_id)
             session.add(new_tag)
             session.commit()
             return True
@@ -256,6 +285,42 @@ class DatabaseService:
                 session.commit()
                 return True
             return False
+
+    def remove_task_tag(self, task_id: int, tag_name: str) -> bool:
+        """Remove a tag from a task."""
+        with self.get_session() as session:
+            tag = (
+                session.query(TagModel)
+                .filter(
+                    TagModel.name == tag_name,
+                    TagModel.linked_type == "task",
+                    TagModel.linked_id == task_id,
+                )
+                .first()
+            )
+
+            if tag:
+                session.delete(tag)
+                session.commit()
+                return True
+            return False
+
+    def get_all_tags(self) -> List[str]:
+        """Get all unique tags used across projects and tasks."""
+        with self.get_session() as session:
+            tags = session.query(TagModel.name).distinct().all()
+            return [tag[0] for tag in tags]
+
+    def get_tags_by_type(self, linked_type: str) -> List[str]:
+        """Get all unique tags for a specific type (project or task)."""
+        with self.get_session() as session:
+            tags = (
+                session.query(TagModel.name)
+                .filter(TagModel.linked_type == linked_type)
+                .distinct()
+                .all()
+            )
+            return [tag[0] for tag in tags]
 
     def _get_project_tags(self, session, project_id: int) -> List[str]:
         """Get tags for a project."""
@@ -287,16 +352,23 @@ class DatabaseService:
     # Task CRUD operations
     def create_task(self, **kwargs) -> Task:
         """Create a new task."""
+        # Extract tags from kwargs since they're not part of TaskModel
+        tags = kwargs.pop("tags", [])
+
         with self.get_session() as session:
             db_task = TaskModel(**kwargs)
             session.add(db_task)
             session.commit()
             session.refresh(db_task)
 
-            # Get tags for this task
-            tags = self._get_task_tags(session, db_task.id)
+            # Add tags separately
+            for tag_name in tags:
+                self.add_task_tag(db_task.id, tag_name)
 
-            return self._task_model_to_dataclass(db_task, tags)
+            # Get tags for this task
+            task_tags = self._get_task_tags(session, db_task.id)
+
+            return self._task_model_to_dataclass(db_task, task_tags)
 
     def get_tasks(self, project_id: Optional[int] = None) -> List[Task]:
         """Get all tasks, optionally filtered by project."""
@@ -309,10 +381,62 @@ class DatabaseService:
             tasks = []
 
             for db_task in db_tasks:
-                tags = self._get_task_tags(session, db_task.id)
-                tasks.append(self._task_model_to_dataclass(db_task, tags))
+                task_tags = self._get_task_tags(session, db_task.id)
+                task = self._task_model_to_dataclass(db_task, task_tags)
+                tasks.append(task)
 
             return tasks
+
+    def get_task(self, task_id: int) -> Optional[Task]:
+        """Get a specific task by ID."""
+        with self.get_session() as session:
+            db_task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
+            if db_task:
+                task_tags = self._get_task_tags(session, db_task.id)
+                return self._task_model_to_dataclass(db_task, task_tags)
+            return None
+
+    def update_task(self, task_id: int, **kwargs) -> Optional[Task]:
+        """Update a task."""
+        # Extract tags from kwargs since they're not part of TaskModel
+        tags = kwargs.pop("tags", None)
+
+        with self.get_session() as session:
+            db_task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
+            if db_task:
+                # Update fields
+                for key, value in kwargs.items():
+                    if hasattr(db_task, key):
+                        setattr(db_task, key, value)
+
+                db_task.updated_at = datetime.now()
+                session.commit()
+                session.refresh(db_task)
+
+                # Update tags if provided
+                if tags is not None:
+                    # Remove old tags
+                    current_tags = self._get_task_tags(session, task_id)
+                    for tag in current_tags:
+                        self.remove_task_tag(task_id, tag)
+                    # Add new tags
+                    for tag in tags:
+                        self.add_task_tag(task_id, tag)
+
+                # Get updated tags
+                task_tags = self._get_task_tags(session, db_task.id)
+                return self._task_model_to_dataclass(db_task, task_tags)
+            return None
+
+    def delete_task(self, task_id: int) -> bool:
+        """Delete a task."""
+        with self.get_session() as session:
+            db_task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
+            if db_task:
+                session.delete(db_task)
+                session.commit()
+                return True
+            return False
 
     def _get_task_tags(self, session, task_id: int) -> List[str]:
         """Get tags for a task."""
@@ -332,6 +456,7 @@ class DatabaseService:
             description=db_task.description or "",
             completed=db_task.completed,
             due_date=db_task.due_date,
+            estimated_hours=db_task.estimated_hours,
             priority=db_task.priority,
             tags=tags,
             created_at=db_task.created_at,

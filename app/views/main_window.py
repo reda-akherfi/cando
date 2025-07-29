@@ -8,30 +8,34 @@ primary user interface with tabbed views for different functionality.
 from PySide6.QtWidgets import (
     QMainWindow,
     QTabWidget,
-    QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QListWidget,
-    QListWidgetItem,
-    QApplication,
+    QWidget,
     QMessageBox,
     QComboBox,
+    QApplication,
 )
-from app.ui.ui_main import UiMainWindow
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 from app.ui.chart_widget import (
     TimeByProjectChart,
     DailyProductivityChart,
     TimerTypeChart,
 )
+from app.ui.theme import DarkTheme
 from app.ui.project_dialog import ProjectDialog
 from app.ui.project_list_widget import ProjectListWidget
+from app.ui.task_dialog import TaskDialog
+from app.ui.task_list_widget import TaskListWidget
+from app.ui.ui_main import UiMainWindow
+from app.models.project import Project
+from app.models.task import Task
 from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.controllers.timer_controller import TimerController
-from app.ui.theme import DarkTheme
-from app.models.project import Project
 
 
 class MainWindow(QMainWindow):
@@ -148,19 +152,29 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.project_list_widget)
 
-        # Task list for selected project
-        layout.addWidget(QLabel("Tasks:"))
-        self.task_list = QListWidget()
-        layout.addWidget(self.task_list)
+        # Task management section
+        task_section_label = QLabel("Tasks:")
+        task_section_label.setFont(QFont("Arial", 12, QFont.Bold))
+        layout.addWidget(task_section_label)
 
-        # Task management buttons
+        # Task controls
         task_controls_layout = QHBoxLayout()
         self.add_task_btn = QPushButton("Add Task")
-        self.add_task_btn.clicked.connect(self.add_sample_task)
+        self.add_task_btn.clicked.connect(self.add_task)
+        self.add_task_btn.setEnabled(False)  # Disabled until project is selected
+
         task_controls_layout.addWidget(self.add_task_btn)
         task_controls_layout.addStretch()
 
         layout.addLayout(task_controls_layout)
+
+        # Task list
+        self.task_list_widget = TaskListWidget()
+        self.task_list_widget.task_edit_requested.connect(self.edit_task)
+        self.task_list_widget.task_delete_requested.connect(self.delete_task)
+        self.task_list_widget.task_selected.connect(self.on_task_selected)
+
+        layout.addWidget(self.task_list_widget)
 
     def setup_timer_tab(self):
         """Set up the timer tab with timer controls."""
@@ -256,21 +270,14 @@ class MainWindow(QMainWindow):
 
     def on_project_selected(self, project: Project):
         """Handle project selection."""
+        self.current_project_id = project.id
         self.refresh_task_list(project.id)
 
     def refresh_task_list(self, project_id: int):
         """Refresh the task list for a selected project."""
-        self.task_list.clear()
         tasks = self.db_service.get_tasks(project_id=project_id)
-
-        for task in tasks:
-            status = "✓" if task.completed else "○"
-            due_date_str = (
-                task.due_date.strftime("%Y-%m-%d") if task.due_date else "No due date"
-            )
-            item = QListWidgetItem(f"{status} {task.name} (Due: {due_date_str})")
-            item.setData(1, task.id)  # Store task ID
-            self.task_list.addItem(item)
+        self.task_list_widget.update_tasks(tasks)
+        self.add_task_btn.setEnabled(True)
 
     def add_project(self):
         """Add a new project."""
@@ -364,6 +371,91 @@ class MainWindow(QMainWindow):
             self.refresh_charts()
         else:
             self.timer_status_label.setText("No active timer to stop")
+
+    def add_task(self):
+        """Add a new task."""
+        if not hasattr(self, "current_project_id") or self.current_project_id is None:
+            QMessageBox.warning(
+                self, "No Project Selected", "Please select a project first."
+            )
+            return
+
+        dialog = TaskDialog(self, project_id=self.current_project_id)
+        if dialog.exec_() == TaskDialog.Accepted:
+            task_data = dialog.get_task_data()
+
+            # Extract tags for separate handling
+            tags = task_data.pop("tags", [])
+
+            # Create task
+            task = self.db_service.create_task(**task_data)
+
+            # Add tags separately
+            for tag in tags:
+                self.db_service.add_task_tag(task.id, tag)
+
+            self.refresh_task_list(self.current_project_id)
+            QMessageBox.information(
+                self, "Success", f"Task '{task.name}' created successfully!"
+            )
+
+    def edit_task(self, task: Task):
+        """Edit an existing task."""
+        dialog = TaskDialog(self, task=task)
+        if dialog.exec_() == TaskDialog.Accepted:
+            if dialog.task is None:
+                # Task was deleted
+                self.db_service.delete_task(task.id)
+                self.refresh_task_list(self.current_project_id)
+                QMessageBox.information(
+                    self, "Success", f"Task '{task.name}' deleted successfully!"
+                )
+            else:
+                # Task was updated
+                task_data = dialog.get_task_data()
+
+                # Extract tags for separate handling
+                new_tags = task_data.pop("tags", [])
+
+                # Update task
+                updated_task = self.db_service.update_task(task.id, **task_data)
+
+                # Update tags (remove old ones, add new ones)
+                for tag in task.tags:
+                    self.db_service.remove_task_tag(task.id, tag)
+                for tag in new_tags:
+                    self.db_service.add_task_tag(task.id, tag)
+
+                self.refresh_task_list(self.current_project_id)
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Task '{updated_task.name}' updated successfully!",
+                )
+
+    def delete_task(self, task: Task):
+        """Delete a task."""
+        reply = QMessageBox.question(
+            self,
+            "Delete Task",
+            f"Are you sure you want to delete task '{task.name}'?\n\nThis action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+
+        if reply == QMessageBox.Yes:
+            self.db_service.delete_task(task.id)
+            self.refresh_task_list(self.current_project_id)
+            QMessageBox.information(
+                self, "Success", f"Task '{task.name}' deleted successfully!"
+            )
+
+    def on_task_selected(self, task: Task):
+        """Handle task selection."""
+        # This method is not strictly needed for the current implementation
+        # as the task_list_widget handles selection internally.
+        # However, it can be used if specific actions are needed on task selection.
+        pass
 
     def add_sample_task(self):
         """Add a sample task for testing."""
