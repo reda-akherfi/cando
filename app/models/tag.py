@@ -2,16 +2,21 @@
 Tag model
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 
 @dataclass
 class Tag:
     """
-    Tag model
+    Tag entity representing a reusable tag.
+
+    Tags can be attached to projects and tasks for categorization
+    and organization purposes.
     """
 
-    id: int
-    name: str
-    linked_type: str  # 'project' or 'task'
-    linked_id: int
+    id: Optional[int] = None
+    name: str = ""
+    usage_count: int = 0
+    linked_projects: List[int] = field(default_factory=list)
+    linked_tasks: List[int] = field(default_factory=list)

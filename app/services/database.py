@@ -6,7 +6,7 @@ for the productivity application.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy import (
     create_engine,
     Column,
@@ -321,6 +321,116 @@ class DatabaseService:
                 .all()
             )
             return [tag[0] for tag in tags]
+
+    def get_tags(self) -> List[Tag]:
+        """Get all tags with usage statistics."""
+        with self.get_session() as session:
+            # Get all unique tag names
+            tag_names = (
+                session.query(TagModel.name).distinct().order_by(TagModel.name).all()
+            )
+
+            tags = []
+            for (tag_name,) in tag_names:
+                # Count usage for this tag
+                usage_count = (
+                    session.query(TagModel).filter(TagModel.name == tag_name).count()
+                )
+
+                # Get linked items (projects and tasks)
+                linked_projects = (
+                    session.query(TagModel.linked_id)
+                    .filter(
+                        TagModel.name == tag_name, TagModel.linked_type == "project"
+                    )
+                    .all()
+                )
+
+                linked_tasks = (
+                    session.query(TagModel.linked_id)
+                    .filter(TagModel.name == tag_name, TagModel.linked_type == "task")
+                    .all()
+                )
+
+                tag = Tag(
+                    id=len(tags) + 1,  # Simple ID for display
+                    name=tag_name,
+                    usage_count=usage_count,
+                    linked_projects=[p[0] for p in linked_projects],
+                    linked_tasks=[t[0] for t in linked_tasks],
+                )
+                tags.append(tag)
+
+            return tags
+
+    def add_tag(self, tag_name: str) -> bool:
+        """Add a new tag (if it doesn't exist)."""
+        with self.get_session() as session:
+            # Check if tag already exists
+            existing_tag = (
+                session.query(TagModel).filter(TagModel.name == tag_name).first()
+            )
+
+            if existing_tag:
+                return False  # Tag already exists
+
+            # Create a dummy tag entry to establish the tag
+            # This will be replaced when the tag is actually used
+            dummy_tag = TagModel(name=tag_name, linked_type="dummy", linked_id=0)
+            session.add(dummy_tag)
+            session.commit()
+            return True
+
+    def update_tag(self, old_name: str, new_name: str) -> bool:
+        """Update a tag name across all its usages."""
+        with self.get_session() as session:
+            # Check if new name already exists
+            existing_tag = (
+                session.query(TagModel).filter(TagModel.name == new_name).first()
+            )
+
+            if existing_tag:
+                return False  # New name already exists
+
+            # Update all instances of the old tag name
+            tags_to_update = (
+                session.query(TagModel).filter(TagModel.name == old_name).all()
+            )
+
+            for tag in tags_to_update:
+                tag.name = new_name
+
+            session.commit()
+            return True
+
+    def delete_tag(self, tag_name: str) -> bool:
+        """Delete a tag and all its usages."""
+        with self.get_session() as session:
+            tags_to_delete = (
+                session.query(TagModel).filter(TagModel.name == tag_name).all()
+            )
+
+            if not tags_to_delete:
+                return False
+
+            for tag in tags_to_delete:
+                session.delete(tag)
+
+            session.commit()
+            return True
+
+    def get_tag_usage_stats(self) -> List[Tuple[str, int]]:
+        """Get tag usage statistics sorted by popularity."""
+        with self.get_session() as session:
+            # Get tag usage counts
+            tag_counts = (
+                session.query(TagModel.name, func.count(TagModel.id))
+                .group_by(TagModel.name)
+                .order_by(func.count(TagModel.id).desc())
+                .all()
+            )
+
+            return [(name, count) for name, count in tag_counts]
 
     def _get_project_tags(self, session, project_id: int) -> List[str]:
         """Get tags for a project."""

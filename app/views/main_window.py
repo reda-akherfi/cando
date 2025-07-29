@@ -18,9 +18,10 @@ from PySide6.QtWidgets import (
     QComboBox,
     QApplication,
     QLineEdit,
+    QInputDialog,
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QShortcut, QKeySequence
 from app.ui.chart_widget import (
     TimeByProjectChart,
     DailyProductivityChart,
@@ -31,6 +32,7 @@ from app.ui.project_dialog import ProjectDialog
 from app.ui.project_list_widget import ProjectListWidget
 from app.ui.task_dialog import TaskDialog
 from app.ui.task_list_widget import TaskListWidget
+from app.ui.tag_list_widget import TagListWidget
 from app.ui.ui_main import UiMainWindow
 from app.models.project import Project
 from app.models.task import Task
@@ -38,6 +40,7 @@ from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.controllers.timer_controller import TimerController
 from app.utils.fuzzy_search import fuzzy_search
+from app.models.tag import Tag
 
 
 class MainWindow(QMainWindow):
@@ -79,18 +82,21 @@ class MainWindow(QMainWindow):
         # Create tab content
         self.dashboard_tab = QWidget()
         self.projects_tab = QWidget()
+        self.tags_tab = QWidget()
         self.timer_tab = QWidget()
         self.settings_tab = QWidget()
 
         # Add tabs
         self.tab_widget.addTab(self.dashboard_tab, "Dashboard")
         self.tab_widget.addTab(self.projects_tab, "Projects")
+        self.tab_widget.addTab(self.tags_tab, "Tags")
         self.tab_widget.addTab(self.timer_tab, "Timer")
         self.tab_widget.addTab(self.settings_tab, "Settings")
 
         # Set up tab layouts
         self.setup_dashboard_tab()
         self.setup_projects_tab()
+        self.setup_tags_tab()
         self.setup_timer_tab()
         self.setup_settings_tab()
 
@@ -296,6 +302,72 @@ class MainWindow(QMainWindow):
         layout.addWidget(reset_data_btn)
         layout.addStretch()
 
+    def setup_tags_tab(self):
+        """Set up the tags tab for managing tags."""
+        layout = QVBoxLayout(self.tags_tab)
+
+        # Search and sort controls
+        controls_layout = QHBoxLayout()
+
+        # Search functionality
+        search_label = QLabel("Search Tags:")
+        self.tag_search_input = QLineEdit()
+        self.tag_search_input.setPlaceholderText("Search tags by name... (Ctrl+T)")
+        self.tag_search_input.textChanged.connect(self.on_tag_search_text_changed)
+        self.tag_search_input.setMinimumWidth(300)
+
+        # Add keyboard shortcut for tag search
+        tag_search_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
+        tag_search_shortcut.activated.connect(self.focus_tag_search)
+
+        # Add Escape key to clear tag search
+        tag_escape_shortcut = QShortcut(QKeySequence("Escape"), self.tag_search_input)
+        tag_escape_shortcut.activated.connect(self.clear_tag_search)
+
+        # Add clear button for tag search
+        self.clear_tag_search_btn = QPushButton("Clear")
+        self.clear_tag_search_btn.clicked.connect(self.clear_tag_search)
+        self.clear_tag_search_btn.setMaximumWidth(60)
+
+        # Sort controls
+        sort_label = QLabel("Sort by:")
+        self.tag_sort_combo = QComboBox()
+        self.tag_sort_combo.addItems(
+            [
+                "Name (A-Z)",
+                "Name (Z-A)",
+                "Popularity (High-Low)",
+                "Popularity (Low-High)",
+            ]
+        )
+        self.tag_sort_combo.currentTextChanged.connect(self.on_tag_sort_changed)
+
+        controls_layout.addWidget(search_label)
+        controls_layout.addWidget(self.tag_search_input)
+        controls_layout.addWidget(self.clear_tag_search_btn)
+        controls_layout.addStretch()
+        controls_layout.addWidget(sort_label)
+        controls_layout.addWidget(self.tag_sort_combo)
+
+        layout.addLayout(controls_layout)
+
+        # Tag search results counter
+        self.tag_search_results_label = QLabel("")
+        self.tag_search_results_label.setStyleSheet("color: #888; font-size: 11px;")
+        layout.addWidget(self.tag_search_results_label)
+
+        # Tag list
+        self.tag_list_widget = TagListWidget()
+        self.tag_list_widget.tag_edit_requested.connect(self.edit_tag)
+        self.tag_list_widget.tag_delete_requested.connect(self.delete_tag)
+        self.tag_list_widget.tag_selected.connect(self.on_tag_selected)
+        layout.addWidget(self.tag_list_widget)
+
+        # Add new tag button
+        self.add_tag_btn = QPushButton("Add Tag")
+        self.add_tag_btn.clicked.connect(self.add_tag)
+        layout.addWidget(self.add_tag_btn)
+
     def toggle_theme(self):
         """Toggle between light and dark themes."""
         app = QApplication.instance()
@@ -319,6 +391,7 @@ class MainWindow(QMainWindow):
         """Refresh all data displays."""
         self.refresh_project_list()
         self.refresh_charts()
+        self.refresh_tags()
 
     def refresh_project_list(self):
         """Refresh the project list display."""
@@ -618,6 +691,109 @@ class MainWindow(QMainWindow):
                 due_date=datetime.now() + timedelta(days=7),
             )
             self.refresh_task_list(projects[0].id)
+
+    def refresh_tags(self):
+        """Refresh the list of tags."""
+        search_text = self.tag_search_input.text().strip()
+        sort_option = self.tag_sort_combo.currentText()
+
+        all_tags = self.db_service.get_tags()
+
+        # Apply search filter
+        if search_text:
+            search_fields = ["name"]
+            search_results = fuzzy_search(
+                search_text, all_tags, search_fields, threshold=0.2
+            )
+            tags = [item for item, score in search_results]
+        else:
+            tags = all_tags
+
+        # Apply sorting
+        if sort_option == "Name (A-Z)":
+            tags.sort(key=lambda x: x.name.lower())
+        elif sort_option == "Name (Z-A)":
+            tags.sort(key=lambda x: x.name.lower(), reverse=True)
+        elif sort_option == "Popularity (High-Low)":
+            tags.sort(key=lambda x: x.usage_count, reverse=True)
+        elif sort_option == "Popularity (Low-High)":
+            tags.sort(key=lambda x: x.usage_count)
+
+        self.tag_search_results_label.setText(
+            f"Showing {len(tags)} of {len(all_tags)} tags"
+        )
+
+        self.tag_list_widget.update_tags(tags, search_text)
+
+    def on_tag_search_text_changed(self):
+        """Handle tag search text changes."""
+        self.refresh_tags()
+
+    def on_tag_sort_changed(self):
+        """Handle tag sort option changes."""
+        self.refresh_tags()
+
+    def focus_tag_search(self):
+        """Focus the tag search input field."""
+        self.tag_search_input.setFocus()
+
+    def clear_tag_search(self):
+        """Clear the tag search input field."""
+        self.tag_search_input.clear()
+        self.refresh_tags()
+
+    def on_tag_selected(self, tag: Tag):
+        """Handle tag selection."""
+        # This method is not strictly needed for the current implementation
+        # as the tag_list_widget handles selection internally.
+        # However, it can be used if specific actions are needed on tag selection.
+        pass
+
+    def edit_tag(self, tag: Tag):
+        """Edit the name of a tag."""
+        new_name, ok = QInputDialog.getText(
+            self, "Edit Tag", "Enter new tag name:", QLineEdit.Normal, tag.name
+        )
+        if ok and new_name and new_name.strip():
+            new_name = new_name.strip()
+            if self.db_service.update_tag(tag.name, new_name):
+                self.refresh_tags()
+                QMessageBox.information(
+                    self, "Success", f"Tag '{tag.name}' updated to '{new_name}'"
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    f"Tag '{new_name}' already exists or could not be updated.",
+                )
+
+    def delete_tag(self, tag: Tag):
+        """Delete a tag."""
+        if self.db_service.delete_tag(tag.name):
+            self.refresh_tags()
+            QMessageBox.information(
+                self, "Success", f"Tag '{tag.name}' deleted successfully!"
+            )
+        else:
+            QMessageBox.warning(
+                self, "Error", f"Tag '{tag.name}' could not be deleted."
+            )
+
+    def add_tag(self):
+        """Add a new tag."""
+        new_tag, ok = QInputDialog.getText(
+            self, "Add Tag", "Enter new tag name:", QLineEdit.Normal
+        )
+        if ok and new_tag and new_tag.strip():
+            new_tag = new_tag.strip()
+            if self.db_service.add_tag(new_tag):
+                self.refresh_tags()
+                QMessageBox.information(
+                    self, "Success", f"Tag '{new_tag}' added successfully!"
+                )
+            else:
+                QMessageBox.warning(self, "Error", f"Tag '{new_tag}' already exists.")
 
     def clear_all_data(self):
         """Clear all data from the database."""
