@@ -1,8 +1,8 @@
 """
 Database service for the Cando application.
 
-This module provides SQLAlchemy-based data persistence using SQLite.
-It includes database models, session management, and CRUD operations.
+This module provides SQLAlchemy ORM models and database operations
+for the productivity application.
 """
 
 from datetime import datetime
@@ -14,12 +14,17 @@ from sqlalchemy import (
     String,
     DateTime,
     Boolean,
-    ForeignKey,
+    Float,
     Text,
+    ForeignKey,
+    func,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship, Session
-from sqlalchemy.sql import func
+from sqlalchemy.orm import sessionmaker, relationship
+from app.models.project import Project
+from app.models.task import Task
+from app.models.tag import Tag
+from app.models.timer import Timer
 
 Base = declarative_base()
 
@@ -30,10 +35,17 @@ class ProjectModel(Base):
     __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False)
+    name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
+    due_date = Column(DateTime, nullable=True)
+    estimated_hours = Column(Float, nullable=True)
+    priority = Column(String(20), default="medium")  # low, medium, high, urgent
+    status = Column(
+        String(20), default="active"
+    )  # active, completed, paused, cancelled
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    completed_at = Column(DateTime, nullable=True)
 
     # Relationships
     tasks = relationship(
@@ -48,9 +60,11 @@ class TaskModel(Base):
 
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    name = Column(String(255), nullable=False)
-    due_date = Column(DateTime, nullable=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
     completed = Column(Boolean, default=False)
+    due_date = Column(DateTime, nullable=True)
+    priority = Column(String(20), default="medium")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -82,7 +96,7 @@ class TimerModel(Base):
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     start = Column(DateTime, nullable=False)
     end = Column(DateTime, nullable=True)
-    type = Column(String(50), nullable=False)  # 'maduro', 'countdown', 'stopwatch'
+    type = Column(String(20), default="stopwatch")  # stopwatch, countdown, maduro
     created_at = Column(DateTime, default=func.now())
 
     # Relationships
@@ -90,202 +104,281 @@ class TimerModel(Base):
 
 
 class DatabaseService:
-    """
-    Service for managing database operations.
-
-    Provides CRUD operations for all entities and database session management.
-    """
+    """Service class for database operations."""
 
     def __init__(self, db_url: str = "sqlite:///cando.db"):
-        """
-        Initialize the database service.
-
-        Args:
-            db_url: SQLAlchemy database URL
-        """
+        """Initialize database service."""
         self.engine = create_engine(db_url, echo=False)
+        Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(
             autocommit=False, autoflush=False, bind=self.engine
         )
 
-        # Create tables
-        Base.metadata.create_all(bind=self.engine)
-
-    def get_session(self) -> Session:
-        """Get a new database session."""
+    def get_session(self):
+        """Get database session."""
         return self.SessionLocal()
 
     # Project CRUD operations
-    def create_project(self, name: str, description: str = "") -> ProjectModel:
+    def create_project(self, **kwargs) -> Project:
         """Create a new project."""
+        # Extract tags from kwargs since they're not part of ProjectModel
+        tags = kwargs.pop("tags", [])
+
         with self.get_session() as session:
-            project = ProjectModel(name=name, description=description)
-            session.add(project)
+            db_project = ProjectModel(**kwargs)
+            session.add(db_project)
             session.commit()
-            session.refresh(project)
-            return project
+            session.refresh(db_project)
 
-    def get_projects(self) -> List[ProjectModel]:
-        """Get all projects."""
-        with self.get_session() as session:
-            return session.query(ProjectModel).all()
+            # Get tags for this project
+            project_tags = self._get_project_tags(session, db_project.id)
 
-    def get_project(self, project_id: int) -> Optional[ProjectModel]:
-        """Get a project by ID."""
+            return self._project_model_to_dataclass(db_project, project_tags)
+
+    def get_projects(self, status: Optional[str] = None) -> List[Project]:
+        """Get all projects, optionally filtered by status."""
         with self.get_session() as session:
-            return (
+            query = session.query(ProjectModel)
+            if status:
+                query = query.filter(ProjectModel.status == status)
+
+            db_projects = query.all()
+            projects = []
+
+            for db_project in db_projects:
+                tags = self._get_project_tags(session, db_project.id)
+                projects.append(self._project_model_to_dataclass(db_project, tags))
+
+            return projects
+
+    def get_project(self, project_id: int) -> Optional[Project]:
+        """Get a specific project by ID."""
+        with self.get_session() as session:
+            db_project = (
                 session.query(ProjectModel)
                 .filter(ProjectModel.id == project_id)
                 .first()
             )
+            if db_project:
+                tags = self._get_project_tags(session, db_project.id)
+                return self._project_model_to_dataclass(db_project, tags)
+            return None
 
-    def update_project(
-        self, project_id: int, name: str = None, description: str = None
-    ) -> Optional[ProjectModel]:
+    def update_project(self, project_id: int, **kwargs) -> Optional[Project]:
         """Update a project."""
+        # Extract tags from kwargs since they're not part of ProjectModel
+        tags = kwargs.pop("tags", None)
+
         with self.get_session() as session:
-            project = (
+            db_project = (
                 session.query(ProjectModel)
                 .filter(ProjectModel.id == project_id)
                 .first()
             )
-            if project:
-                if name is not None:
-                    project.name = name
-                if description is not None:
-                    project.description = description
+            if db_project:
+                # Update fields
+                for key, value in kwargs.items():
+                    if hasattr(db_project, key):
+                        setattr(db_project, key, value)
+
+                db_project.updated_at = datetime.now()
                 session.commit()
-                session.refresh(project)
-            return project
+                session.refresh(db_project)
+
+                # Get updated tags
+                project_tags = self._get_project_tags(session, db_project.id)
+                return self._project_model_to_dataclass(db_project, project_tags)
+            return None
 
     def delete_project(self, project_id: int) -> bool:
         """Delete a project."""
         with self.get_session() as session:
+            db_project = (
+                session.query(ProjectModel)
+                .filter(ProjectModel.id == project_id)
+                .first()
+            )
+            if db_project:
+                session.delete(db_project)
+                session.commit()
+                return True
+            return False
+
+    def add_project_tag(self, project_id: int, tag_name: str) -> bool:
+        """Add a tag to a project."""
+        with self.get_session() as session:
+            # Check if project exists
             project = (
                 session.query(ProjectModel)
                 .filter(ProjectModel.id == project_id)
                 .first()
             )
-            if project:
-                session.delete(project)
-                session.commit()
-                return True
-            return False
+            if not project:
+                return False
 
-    # Task CRUD operations
-    def create_task(
-        self, project_id: int, name: str, due_date: datetime = None
-    ) -> TaskModel:
-        """Create a new task."""
-        with self.get_session() as session:
-            task = TaskModel(project_id=project_id, name=name, due_date=due_date)
-            session.add(task)
+            # Check if tag already exists
+            existing_tag = (
+                session.query(TagModel)
+                .filter(
+                    TagModel.name == tag_name,
+                    TagModel.linked_type == "project",
+                    TagModel.linked_id == project_id,
+                )
+                .first()
+            )
+
+            if existing_tag:
+                return False  # Tag already exists
+
+            # Create new tag
+            new_tag = TagModel(
+                name=tag_name, linked_type="project", linked_id=project_id
+            )
+            session.add(new_tag)
             session.commit()
-            session.refresh(task)
-            return task
+            return True
 
-    def get_tasks(self, project_id: int = None) -> List[TaskModel]:
-        """Get all tasks, optionally filtered by project."""
+    def remove_project_tag(self, project_id: int, tag_name: str) -> bool:
+        """Remove a tag from a project."""
         with self.get_session() as session:
-            query = session.query(TaskModel)
-            if project_id:
-                query = query.filter(TaskModel.project_id == project_id)
-            return query.all()
+            tag = (
+                session.query(TagModel)
+                .filter(
+                    TagModel.name == tag_name,
+                    TagModel.linked_type == "project",
+                    TagModel.linked_id == project_id,
+                )
+                .first()
+            )
 
-    def get_task(self, task_id: int) -> Optional[TaskModel]:
-        """Get a task by ID."""
-        with self.get_session() as session:
-            return session.query(TaskModel).filter(TaskModel.id == task_id).first()
-
-    def update_task(
-        self,
-        task_id: int,
-        name: str = None,
-        due_date: datetime = None,
-        completed: bool = None,
-    ) -> Optional[TaskModel]:
-        """Update a task."""
-        with self.get_session() as session:
-            task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
-            if task:
-                if name is not None:
-                    task.name = name
-                if due_date is not None:
-                    task.due_date = due_date
-                if completed is not None:
-                    task.completed = completed
-                session.commit()
-                session.refresh(task)
-            return task
-
-    def delete_task(self, task_id: int) -> bool:
-        """Delete a task."""
-        with self.get_session() as session:
-            task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
-            if task:
-                session.delete(task)
-                session.commit()
-                return True
-            return False
-
-    # Timer CRUD operations
-    def create_timer(
-        self, task_id: int, start: datetime, timer_type: str, end: datetime = None
-    ) -> TimerModel:
-        """Create a new timer."""
-        with self.get_session() as session:
-            timer = TimerModel(task_id=task_id, start=start, end=end, type=timer_type)
-            session.add(timer)
-            session.commit()
-            session.refresh(timer)
-            return timer
-
-    def get_timers(self, task_id: int = None) -> List[TimerModel]:
-        """Get all timers, optionally filtered by task."""
-        with self.get_session() as session:
-            query = session.query(TimerModel)
-            if task_id:
-                query = query.filter(TimerModel.task_id == task_id)
-            return query.all()
-
-    def update_timer(self, timer_id: int, end: datetime = None) -> Optional[TimerModel]:
-        """Update a timer (typically to set end time)."""
-        with self.get_session() as session:
-            timer = session.query(TimerModel).filter(TimerModel.id == timer_id).first()
-            if timer and end is not None:
-                timer.end = end
-                session.commit()
-                session.refresh(timer)
-            return timer
-
-    # Tag CRUD operations
-    def create_tag(self, name: str, linked_type: str, linked_id: int) -> TagModel:
-        """Create a new tag."""
-        with self.get_session() as session:
-            tag = TagModel(name=name, linked_type=linked_type, linked_id=linked_id)
-            session.add(tag)
-            session.commit()
-            session.refresh(tag)
-            return tag
-
-    def get_tags(
-        self, linked_type: str = None, linked_id: int = None
-    ) -> List[TagModel]:
-        """Get all tags, optionally filtered by linked entity."""
-        with self.get_session() as session:
-            query = session.query(TagModel)
-            if linked_type:
-                query = query.filter(TagModel.linked_type == linked_type)
-            if linked_id:
-                query = query.filter(TagModel.linked_id == linked_id)
-            return query.all()
-
-    def delete_tag(self, tag_id: int) -> bool:
-        """Delete a tag."""
-        with self.get_session() as session:
-            tag = session.query(TagModel).filter(TagModel.id == tag_id).first()
             if tag:
                 session.delete(tag)
                 session.commit()
                 return True
             return False
+
+    def _get_project_tags(self, session, project_id: int) -> List[str]:
+        """Get tags for a project."""
+        tags = (
+            session.query(TagModel)
+            .filter(TagModel.linked_type == "project", TagModel.linked_id == project_id)
+            .all()
+        )
+        return [tag.name for tag in tags]
+
+    def _project_model_to_dataclass(
+        self, db_project: ProjectModel, tags: List[str]
+    ) -> Project:
+        """Convert ProjectModel to Project dataclass."""
+        return Project(
+            id=db_project.id,
+            name=db_project.name,
+            description=db_project.description or "",
+            due_date=db_project.due_date,
+            estimated_hours=db_project.estimated_hours,
+            priority=db_project.priority,
+            status=db_project.status,
+            tags=tags,
+            created_at=db_project.created_at,
+            updated_at=db_project.updated_at,
+            completed_at=db_project.completed_at,
+        )
+
+    # Task CRUD operations
+    def create_task(self, **kwargs) -> Task:
+        """Create a new task."""
+        with self.get_session() as session:
+            db_task = TaskModel(**kwargs)
+            session.add(db_task)
+            session.commit()
+            session.refresh(db_task)
+
+            # Get tags for this task
+            tags = self._get_task_tags(session, db_task.id)
+
+            return self._task_model_to_dataclass(db_task, tags)
+
+    def get_tasks(self, project_id: Optional[int] = None) -> List[Task]:
+        """Get all tasks, optionally filtered by project."""
+        with self.get_session() as session:
+            query = session.query(TaskModel)
+            if project_id:
+                query = query.filter(TaskModel.project_id == project_id)
+
+            db_tasks = query.all()
+            tasks = []
+
+            for db_task in db_tasks:
+                tags = self._get_task_tags(session, db_task.id)
+                tasks.append(self._task_model_to_dataclass(db_task, tags))
+
+            return tasks
+
+    def _get_task_tags(self, session, task_id: int) -> List[str]:
+        """Get tags for a task."""
+        tags = (
+            session.query(TagModel)
+            .filter(TagModel.linked_type == "task", TagModel.linked_id == task_id)
+            .all()
+        )
+        return [tag.name for tag in tags]
+
+    def _task_model_to_dataclass(self, db_task: TaskModel, tags: List[str]) -> Task:
+        """Convert TaskModel to Task dataclass."""
+        return Task(
+            id=db_task.id,
+            project_id=db_task.project_id,
+            name=db_task.name,
+            description=db_task.description or "",
+            completed=db_task.completed,
+            due_date=db_task.due_date,
+            priority=db_task.priority,
+            tags=tags,
+            created_at=db_task.created_at,
+            updated_at=db_task.updated_at,
+        )
+
+    # Timer CRUD operations
+    def create_timer(self, **kwargs) -> Timer:
+        """Create a new timer."""
+        with self.get_session() as session:
+            db_timer = TimerModel(**kwargs)
+            session.add(db_timer)
+            session.commit()
+            session.refresh(db_timer)
+            return self._timer_model_to_dataclass(db_timer)
+
+    def get_timers(self, task_id: Optional[int] = None) -> List[Timer]:
+        """Get all timers, optionally filtered by task."""
+        with self.get_session() as session:
+            query = session.query(TimerModel)
+            if task_id:
+                query = query.filter(TimerModel.task_id == task_id)
+
+            db_timers = query.all()
+            return [self._timer_model_to_dataclass(timer) for timer in db_timers]
+
+    def update_timer(self, timer_id: int, **kwargs) -> Optional[Timer]:
+        """Update a timer."""
+        with self.get_session() as session:
+            db_timer = (
+                session.query(TimerModel).filter(TimerModel.id == timer_id).first()
+            )
+            if db_timer:
+                for key, value in kwargs.items():
+                    if hasattr(db_timer, key):
+                        setattr(db_timer, key, value)
+                session.commit()
+                session.refresh(db_timer)
+                return self._timer_model_to_dataclass(db_timer)
+            return None
+
+    def _timer_model_to_dataclass(self, db_timer: TimerModel) -> Timer:
+        """Convert TimerModel to Timer dataclass."""
+        return Timer(
+            id=db_timer.id,
+            task_id=db_timer.task_id,
+            start=db_timer.start,
+            end=db_timer.end,
+            type=db_timer.type,
+        )

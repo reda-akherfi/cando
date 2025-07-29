@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QApplication,
+    QMessageBox,
+    QComboBox,
 )
 from app.ui.ui_main import UiMainWindow
 from app.ui.chart_widget import (
@@ -23,10 +25,13 @@ from app.ui.chart_widget import (
     DailyProductivityChart,
     TimerTypeChart,
 )
+from app.ui.project_dialog import ProjectDialog
+from app.ui.project_list_widget import ProjectListWidget
 from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.controllers.timer_controller import TimerController
 from app.ui.theme import DarkTheme
+from app.models.project import Project
 
 
 class MainWindow(QMainWindow):
@@ -112,29 +117,50 @@ class MainWindow(QMainWindow):
         """Set up the projects tab for project and task management."""
         layout = QVBoxLayout(self.projects_tab)
 
-        # Create project list
-        self.project_list = QListWidget()
-        self.project_list.itemClicked.connect(self.on_project_selected)
+        # Project management controls
+        controls_layout = QHBoxLayout()
 
-        # Create task list
-        self.task_list = QListWidget()
+        # Filter controls
+        filter_label = QLabel("Filter by Status:")
+        self.status_filter = QComboBox()
+        self.status_filter.addItems(
+            ["All", "active", "paused", "completed", "cancelled"]
+        )
+        self.status_filter.currentTextChanged.connect(self.refresh_project_list)
 
-        # Create buttons
-        button_layout = QHBoxLayout()
-        add_project_btn = QPushButton("Add Project")
-        add_task_btn = QPushButton("Add Task")
-        add_project_btn.clicked.connect(self.add_sample_project)
-        add_task_btn.clicked.connect(self.add_sample_task)
+        controls_layout.addWidget(filter_label)
+        controls_layout.addWidget(self.status_filter)
+        controls_layout.addStretch()
 
-        button_layout.addWidget(add_project_btn)
-        button_layout.addWidget(add_task_btn)
+        # Action buttons
+        self.add_project_btn = QPushButton("Add Project")
+        self.add_project_btn.clicked.connect(self.add_project)
 
-        # Add widgets to layout
-        layout.addWidget(QLabel("Projects:"))
-        layout.addWidget(self.project_list)
+        controls_layout.addWidget(self.add_project_btn)
+
+        layout.addLayout(controls_layout)
+
+        # Project list
+        self.project_list_widget = ProjectListWidget()
+        self.project_list_widget.project_edit_requested.connect(self.edit_project)
+        self.project_list_widget.project_delete_requested.connect(self.delete_project)
+        self.project_list_widget.project_selected.connect(self.on_project_selected)
+
+        layout.addWidget(self.project_list_widget)
+
+        # Task list for selected project
         layout.addWidget(QLabel("Tasks:"))
+        self.task_list = QListWidget()
         layout.addWidget(self.task_list)
-        layout.addLayout(button_layout)
+
+        # Task management buttons
+        task_controls_layout = QHBoxLayout()
+        self.add_task_btn = QPushButton("Add Task")
+        self.add_task_btn.clicked.connect(self.add_sample_task)
+        task_controls_layout.addWidget(self.add_task_btn)
+        task_controls_layout.addStretch()
+
+        layout.addLayout(task_controls_layout)
 
     def setup_timer_tab(self):
         """Set up the timer tab with timer controls."""
@@ -206,13 +232,13 @@ class MainWindow(QMainWindow):
 
     def refresh_project_list(self):
         """Refresh the project list display."""
-        self.project_list.clear()
-        projects = self.db_service.get_projects()
+        status_filter = self.status_filter.currentText()
+        if status_filter == "All":
+            projects = self.db_service.get_projects()
+        else:
+            projects = self.db_service.get_projects(status=status_filter)
 
-        for project in projects:
-            item = QListWidgetItem(f"{project.name} - {project.description}")
-            item.setData(1, project.id)  # Store project ID
-            self.project_list.addItem(item)
+        self.project_list_widget.update_projects(projects)
 
     def refresh_charts(self):
         """Refresh all charts with current data."""
@@ -228,10 +254,9 @@ class MainWindow(QMainWindow):
         timer_stats = self.analytics_service.get_timer_type_stats()
         self.timer_type_chart.plot_timer_types(timer_stats)
 
-    def on_project_selected(self, item):
+    def on_project_selected(self, project: Project):
         """Handle project selection."""
-        project_id = item.data(1)
-        self.refresh_task_list(project_id)
+        self.refresh_task_list(project.id)
 
     def refresh_task_list(self, project_id: int):
         """Refresh the task list for a selected project."""
@@ -246,6 +271,81 @@ class MainWindow(QMainWindow):
             item = QListWidgetItem(f"{status} {task.name} (Due: {due_date_str})")
             item.setData(1, task.id)  # Store task ID
             self.task_list.addItem(item)
+
+    def add_project(self):
+        """Add a new project."""
+        dialog = ProjectDialog(self)
+        if dialog.exec_() == ProjectDialog.Accepted:
+            project_data = dialog.get_project_data()
+
+            # Extract tags for separate handling
+            tags = project_data.pop("tags", [])
+
+            # Create project
+            project = self.db_service.create_project(**project_data)
+
+            # Add tags separately
+            for tag in tags:
+                self.db_service.add_project_tag(project.id, tag)
+
+            self.refresh_project_list()
+            QMessageBox.information(
+                self, "Success", f"Project '{project.name}' created successfully!"
+            )
+
+    def edit_project(self, project: Project):
+        """Edit an existing project."""
+        dialog = ProjectDialog(self, project)
+        if dialog.exec_() == ProjectDialog.Accepted:
+            if dialog.project is None:
+                # Project was deleted
+                self.db_service.delete_project(project.id)
+                self.refresh_project_list()
+                QMessageBox.information(
+                    self, "Success", f"Project '{project.name}' deleted successfully!"
+                )
+            else:
+                # Project was updated
+                project_data = dialog.get_project_data()
+
+                # Extract tags for separate handling
+                new_tags = project_data.pop("tags", [])
+
+                # Update project
+                updated_project = self.db_service.update_project(
+                    project.id, **project_data
+                )
+
+                # Update tags (remove old ones, add new ones)
+                # This is a simplified approach - in a real app you'd want to be more efficient
+                for tag in project.tags:
+                    self.db_service.remove_project_tag(project.id, tag)
+                for tag in new_tags:
+                    self.db_service.add_project_tag(project.id, tag)
+
+                self.refresh_project_list()
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Project '{updated_project.name}' updated successfully!",
+                )
+
+    def delete_project(self, project: Project):
+        """Delete a project."""
+        reply = QMessageBox.question(
+            self,
+            "Delete Project",
+            f"Are you sure you want to delete project '{project.name}'?\n\nThis action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+
+        if reply == QMessageBox.Yes:
+            self.db_service.delete_project(project.id)
+            self.refresh_project_list()
+            QMessageBox.information(
+                self, "Success", f"Project '{project.name}' deleted successfully!"
+            )
 
     def start_timer(self):
         """Start a timer for the first available task."""
@@ -264,16 +364,6 @@ class MainWindow(QMainWindow):
             self.refresh_charts()
         else:
             self.timer_status_label.setText("No active timer to stop")
-
-    def add_sample_project(self):
-        """Add a sample project for testing."""
-        from datetime import datetime
-
-        project = self.db_service.create_project(
-            name=f"Sample Project {datetime.now().strftime('%H:%M')}",
-            description="Auto-generated sample project",
-        )
-        self.refresh_project_list()
 
     def add_sample_task(self):
         """Add a sample task for testing."""

@@ -1,0 +1,240 @@
+"""
+Project list widget for the Cando application.
+
+This module provides a custom list widget for displaying projects
+with rich information including priority, status, due dates, and tags.
+"""
+
+from datetime import datetime
+from typing import List, Optional
+from PySide6.QtWidgets import (
+    QListWidget,
+    QListWidgetItem,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QFrame,
+    QPushButton,
+    QMenu,
+    QMessageBox,
+)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont, QColor, QPalette
+from app.models.project import Project
+
+
+class ProjectItemWidget(QWidget):
+    """
+    Custom widget for displaying project information in a list item.
+
+    Shows project name, description, priority, status, due date, and tags
+    with color coding and visual indicators.
+    """
+
+    def __init__(self, project: Project, parent=None):
+        """Initialize the project item widget."""
+        super().__init__(parent)
+        self.project = project
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Set up the user interface."""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+
+        # Main project info
+        main_layout = QHBoxLayout()
+
+        # Project name and description
+        info_layout = QVBoxLayout()
+
+        name_label = QLabel(self.project.name)
+        name_label.setFont(QFont("Arial", 10, QFont.Bold))
+        name_label.setStyleSheet(f"color: {self.get_text_color()};")
+        info_layout.addWidget(name_label)
+
+        if self.project.description:
+            desc_label = QLabel(
+                self.project.description[:100] + "..."
+                if len(self.project.description) > 100
+                else self.project.description
+            )
+            desc_label.setFont(QFont("Arial", 8))
+            desc_label.setStyleSheet("color: #888888;")
+            info_layout.addWidget(desc_label)
+
+        main_layout.addLayout(info_layout)
+        main_layout.addStretch()
+
+        # Priority and status indicators
+        indicators_layout = QVBoxLayout()
+
+        # Priority indicator
+        priority_frame = QFrame()
+        priority_frame.setFixedSize(12, 12)
+        priority_frame.setStyleSheet(
+            f"background-color: {self.project.priority_color}; border-radius: 6px;"
+        )
+        priority_layout = QHBoxLayout()
+        priority_layout.addWidget(priority_frame)
+        priority_layout.addWidget(QLabel(self.project.priority.upper()))
+        priority_layout.addStretch()
+        indicators_layout.addLayout(priority_layout)
+
+        # Status indicator
+        status_frame = QFrame()
+        status_frame.setFixedSize(12, 12)
+        status_frame.setStyleSheet(
+            f"background-color: {self.project.status_color}; border-radius: 6px;"
+        )
+        status_layout = QHBoxLayout()
+        status_layout.addWidget(status_frame)
+        status_layout.addWidget(QLabel(self.project.status.upper()))
+        status_layout.addStretch()
+        indicators_layout.addLayout(status_layout)
+
+        main_layout.addLayout(indicators_layout)
+
+        layout.addLayout(main_layout)
+
+        # Secondary info (due date, estimated hours, tags)
+        secondary_layout = QHBoxLayout()
+
+        # Due date
+        if self.project.due_date:
+            due_text = f"Due: {self.project.due_date.strftime('%Y-%m-%d')}"
+            if self.project.is_overdue:
+                due_text += " (OVERDUE)"
+                due_color = "#dc3545"  # Red for overdue
+            elif (
+                self.project.days_remaining is not None
+                and self.project.days_remaining <= 3
+            ):
+                due_color = "#fd7e14"  # Orange for urgent
+            else:
+                due_color = "#6c757d"  # Gray for normal
+
+            due_label = QLabel(due_text)
+            due_label.setFont(QFont("Arial", 8))
+            due_label.setStyleSheet(f"color: {due_color};")
+            secondary_layout.addWidget(due_label)
+
+        secondary_layout.addStretch()
+
+        # Estimated hours
+        if self.project.estimated_hours:
+            hours_label = QLabel(f"Est: {self.project.estimated_hours}h")
+            hours_label.setFont(QFont("Arial", 8))
+            hours_label.setStyleSheet("color: #6c757d;")
+            secondary_layout.addWidget(hours_label)
+
+        # Tags
+        if self.project.tags:
+            tags_label = QLabel(f"Tags: {', '.join(self.project.tags[:3])}")
+            if len(self.project.tags) > 3:
+                tags_label.setText(tags_label.text() + "...")
+            tags_label.setFont(QFont("Arial", 8))
+            tags_label.setStyleSheet("color: #007bff;")
+            secondary_layout.addWidget(tags_label)
+
+        layout.addLayout(secondary_layout)
+
+    def get_text_color(self) -> str:
+        """Get appropriate text color based on project status."""
+        if self.project.status == "completed":
+            return "#28a745"  # Green
+        elif self.project.status == "cancelled":
+            return "#6c757d"  # Gray
+        else:
+            return "#ffffff"  # White for active/paused
+
+
+class ProjectListWidget(QListWidget):
+    """
+    Custom list widget for displaying projects with rich information.
+
+    Provides context menu for editing and deleting projects,
+    and visual indicators for project status and priority.
+    """
+
+    project_edit_requested = Signal(Project)
+    project_delete_requested = Signal(Project)
+    project_selected = Signal(Project)
+
+    def __init__(self, parent=None):
+        """Initialize the project list widget."""
+        super().__init__(parent)
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Set up the user interface."""
+        self.setAlternatingRowColors(True)
+        self.setSpacing(2)
+        self.itemClicked.connect(self.on_item_clicked)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+    def add_project(self, project: Project):
+        """Add a project to the list."""
+        item = QListWidgetItem(self)
+        item_widget = ProjectItemWidget(project)
+        item.setSizeHint(item_widget.sizeHint())
+        self.addItem(item)
+        self.setItemWidget(item, item_widget)
+
+        # Store project reference in item data
+        item.setData(Qt.UserRole, project)
+
+    def update_projects(self, projects: List[Project]):
+        """Update the list with new projects."""
+        self.clear()
+        for project in projects:
+            self.add_project(project)
+
+    def get_selected_project(self) -> Optional[Project]:
+        """Get the currently selected project."""
+        current_item = self.currentItem()
+        if current_item:
+            return current_item.data(Qt.UserRole)
+        return None
+
+    def on_item_clicked(self, item: QListWidgetItem):
+        """Handle item click."""
+        project = item.data(Qt.UserRole)
+        if project:
+            self.project_selected.emit(project)
+
+    def show_context_menu(self, position):
+        """Show context menu for the clicked item."""
+        item = self.itemAt(position)
+        if not item:
+            return
+
+        project = item.data(Qt.UserRole)
+        if not project:
+            return
+
+        menu = QMenu(self)
+
+        edit_action = menu.addAction("Edit Project")
+        edit_action.triggered.connect(lambda: self.project_edit_requested.emit(project))
+
+        delete_action = menu.addAction("Delete Project")
+        delete_action.triggered.connect(lambda: self.confirm_delete_project(project))
+
+        menu.exec_(self.mapToGlobal(position))
+
+    def confirm_delete_project(self, project: Project):
+        """Confirm project deletion."""
+        reply = QMessageBox.question(
+            self,
+            "Delete Project",
+            f"Are you sure you want to delete project '{project.name}'?\n\nThis action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+
+        if reply == QMessageBox.Yes:
+            self.project_delete_requested.emit(project)
