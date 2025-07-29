@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QComboBox,
     QApplication,
+    QLineEdit,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -36,6 +37,7 @@ from app.models.task import Task
 from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.controllers.timer_controller import TimerController
+from app.utils.fuzzy_search import fuzzy_search
 
 
 class MainWindow(QMainWindow):
@@ -124,6 +126,37 @@ class MainWindow(QMainWindow):
         # Project management controls
         controls_layout = QHBoxLayout()
 
+        # Search functionality
+        search_label = QLabel("Search:")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText(
+            "Search projects by name, description, or tags... (Ctrl+F)"
+        )
+        self.search_input.textChanged.connect(self.on_search_text_changed)
+        self.search_input.setMinimumWidth(300)
+
+        # Add keyboard shortcuts
+        from PySide6.QtGui import QKeySequence, QShortcut
+
+        search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        search_shortcut.activated.connect(self.focus_search)
+
+        # Add Escape key to clear search
+        escape_shortcut = QShortcut(QKeySequence("Escape"), self.search_input)
+        escape_shortcut.activated.connect(self.clear_search)
+
+        # Add clear button
+        self.clear_search_btn = QPushButton("Clear")
+        self.clear_search_btn.clicked.connect(self.clear_search)
+        self.clear_search_btn.setMaximumWidth(60)
+
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(self.search_input)
+        search_layout.addWidget(self.clear_search_btn)
+
+        controls_layout.addWidget(search_label)
+        controls_layout.addLayout(search_layout)
+
         # Filter controls
         filter_label = QLabel("Filter by Status:")
         self.status_filter = QComboBox()
@@ -143,6 +176,11 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(self.add_project_btn)
 
         layout.addLayout(controls_layout)
+
+        # Search results counter
+        self.search_results_label = QLabel("")
+        self.search_results_label.setStyleSheet("color: #888; font-size: 11px;")
+        layout.addWidget(self.search_results_label)
 
         # Project list
         self.project_list_widget = ProjectListWidget()
@@ -247,12 +285,44 @@ class MainWindow(QMainWindow):
     def refresh_project_list(self):
         """Refresh the project list display."""
         status_filter = self.status_filter.currentText()
-        if status_filter == "All":
-            projects = self.db_service.get_projects()
-        else:
-            projects = self.db_service.get_projects(status=status_filter)
+        search_text = self.search_input.text().strip()
 
-        self.project_list_widget.update_projects(projects)
+        # Get all projects or filter by status
+        if status_filter == "All":
+            all_projects = self.db_service.get_projects()
+        else:
+            all_projects = self.db_service.get_projects(status=status_filter)
+
+        # Apply fuzzy search if there's a search query
+        if search_text:
+            search_fields = ["name", "description"]
+            search_results = fuzzy_search(
+                search_text, all_projects, search_fields, threshold=0.2
+            )
+            projects = [item for item, score in search_results]
+            self.search_results_label.setText(
+                f"Showing {len(projects)} of {len(all_projects)} results"
+            )
+        else:
+            projects = all_projects
+            self.search_results_label.setText(
+                f"Showing {len(projects)} of {len(all_projects)} results"
+            )
+
+        self.project_list_widget.update_projects(projects, search_text)
+
+    def on_search_text_changed(self):
+        """Handle search text changes."""
+        self.refresh_project_list()
+
+    def clear_search(self):
+        """Clear the search input field."""
+        self.search_input.clear()
+        self.refresh_project_list()
+
+    def focus_search(self):
+        """Focus the search input field."""
+        self.search_input.setFocus()
 
     def refresh_charts(self):
         """Refresh all charts with current data."""

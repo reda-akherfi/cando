@@ -9,11 +9,11 @@ class UiMainWindow:
         self.central_widget = QWidget()
         self.layout = QVBoxLayout(self.central_widget)
 
-        self.label = QLabel("Welcome to Cando")
+        # self.label = QLabel("Welcome to Cando")
         self.start_button = QPushButton("Start Timer")
         self.stop_button = QPushButton("Stop Timer")
 
-        self.layout.addWidget(self.label)
+        # self.layout.addWidget(self.label)
         self.layout.addWidget(self.start_button)
         self.layout.addWidget(self.stop_button)
 

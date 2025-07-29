@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor, QPalette
 from app.models.project import Project
+from app.utils.fuzzy_search import highlight_search_terms
 
 
 class ProjectItemWidget(QWidget):
@@ -32,10 +33,11 @@ class ProjectItemWidget(QWidget):
     with color coding and visual indicators.
     """
 
-    def __init__(self, project: Project, parent=None):
+    def __init__(self, project: Project, search_query: str = "", parent=None):
         """Initialize the project item widget."""
         super().__init__(parent)
         self.project = project
+        self.search_query = search_query
         self.setup_ui()
 
     def setup_ui(self):
@@ -50,19 +52,31 @@ class ProjectItemWidget(QWidget):
         # Project name and description
         info_layout = QVBoxLayout()
 
-        name_label = QLabel(self.project.name)
+        # Highlight search terms in project name
+        name_text = self.project.name
+        if self.search_query:
+            name_text = highlight_search_terms(name_text, self.search_query)
+
+        name_label = QLabel(name_text)
         name_label.setFont(QFont("Arial", 10, QFont.Bold))
         name_label.setStyleSheet(f"color: {self.get_text_color()};")
+        name_label.setTextFormat(Qt.RichText)
         info_layout.addWidget(name_label)
 
         if self.project.description:
-            desc_label = QLabel(
+            # Highlight search terms in description
+            desc_text = (
                 self.project.description[:100] + "..."
                 if len(self.project.description) > 100
                 else self.project.description
             )
+            if self.search_query:
+                desc_text = highlight_search_terms(desc_text, self.search_query)
+
+            desc_label = QLabel(desc_text)
             desc_label.setFont(QFont("Arial", 8))
             desc_label.setStyleSheet("color: #888888;")
+            desc_label.setTextFormat(Qt.RichText)
             info_layout.addWidget(desc_label)
 
         main_layout.addLayout(info_layout)
@@ -176,22 +190,20 @@ class ProjectListWidget(QListWidget):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
 
-    def add_project(self, project: Project):
+    def add_project(self, project: Project, search_query: str = ""):
         """Add a project to the list."""
         item = QListWidgetItem(self)
-        item_widget = ProjectItemWidget(project)
+        item_widget = ProjectItemWidget(project, search_query)
         item.setSizeHint(item_widget.sizeHint())
         self.addItem(item)
         self.setItemWidget(item, item_widget)
-
-        # Store project reference in item data
         item.setData(Qt.UserRole, project)
 
-    def update_projects(self, projects: List[Project]):
+    def update_projects(self, projects: List[Project], search_query: str = ""):
         """Update the list with new projects."""
         self.clear()
         for project in projects:
-            self.add_project(project)
+            self.add_project(project, search_query)
 
     def get_selected_project(self) -> Optional[Project]:
         """Get the currently selected project."""
