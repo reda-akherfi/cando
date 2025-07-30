@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QCheckBox,
     QDialog,
+    QScrollArea,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
@@ -330,9 +331,16 @@ class MainWindow(QMainWindow):
         """Set up the timer tab with comprehensive timer widget."""
         layout = QVBoxLayout(self.timer_tab)
 
+        # Create scroll area for the timer widget
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
         # Create and add the comprehensive timer widget
         self.timer_widget = TimerWidget(self.timer_controller, self.db_service)
-        layout.addWidget(self.timer_widget)
+        scroll_area.setWidget(self.timer_widget)
+        layout.addWidget(scroll_area)
 
         # Connect timer widget signals
         self.timer_widget.timer_started.connect(self.on_timer_started)
