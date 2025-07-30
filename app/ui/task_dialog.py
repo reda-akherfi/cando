@@ -8,7 +8,6 @@ with all task fields and tag management.
 from datetime import datetime, timedelta
 from typing import List, Optional
 from PySide6.QtWidgets import (
-    QDialog,
     QVBoxLayout,
     QHBoxLayout,
     QFormLayout,
@@ -30,9 +29,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont, QColor
 from app.models.task import Task
+from app.ui.base_dialog import BaseDialog
 
 
-class TaskDialog(QDialog):
+class TaskDialog(BaseDialog):
     """
     Dialog for creating and editing tasks.
 
@@ -58,7 +58,6 @@ class TaskDialog(QDialog):
 
         self.setWindowTitle("Edit Task" if self.is_editing else "New Task")
         self.setModal(True)
-        self.resize(500, 600)
 
         self.setup_ui()
         self.load_task_data()

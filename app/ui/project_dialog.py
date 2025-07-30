@@ -8,7 +8,6 @@ with all project fields and tag management.
 from datetime import datetime, timedelta
 from typing import List, Optional
 from PySide6.QtWidgets import (
-    QDialog,
     QVBoxLayout,
     QHBoxLayout,
     QFormLayout,
@@ -29,9 +28,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont, QColor
 from app.models.project import Project
+from app.ui.base_dialog import BaseDialog
 
 
-class ProjectDialog(QDialog):
+class ProjectDialog(BaseDialog):
     """
     Dialog for creating and editing projects.
 
@@ -53,7 +53,6 @@ class ProjectDialog(QDialog):
 
         self.setWindowTitle("Edit Project" if self.is_editing else "New Project")
         self.setModal(True)
-        self.resize(600, 700)
 
         self.setup_ui()
         self.load_project_data()
