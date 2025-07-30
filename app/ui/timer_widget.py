@@ -44,25 +44,41 @@ class TimerWidget(QWidget):
         self.timer_controller = timer_controller
         self.db_service = db_service
         self.current_task: Optional[Task] = None
+        self.current_project_id: Optional[int] = None
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_display)
         self.update_timer.start(1000)  # Update every second
 
         self.setup_ui()
-        self.refresh_tasks()
+        self.refresh_projects()
         self.update_display()
 
     def setup_ui(self):
         """Set up the timer user interface."""
         layout = QVBoxLayout(self)
 
+        # Project and Task selection
+        selection_group = QGroupBox("Select Project & Task")
+        selection_layout = QHBoxLayout(selection_group)
+
+        # Project selection
+        project_layout = QVBoxLayout()
+        project_layout.addWidget(QLabel("Project:"))
+        self.project_combo = QComboBox()
+        self.project_combo.currentIndexChanged.connect(self.on_project_selected)
+        project_layout.addWidget(self.project_combo)
+        selection_layout.addLayout(project_layout)
+
         # Task selection
-        task_group = QGroupBox("Select Task")
-        task_layout = QVBoxLayout(task_group)
+        task_layout = QVBoxLayout()
+        task_layout.addWidget(QLabel("Task:"))
         self.task_combo = QComboBox()
         self.task_combo.currentIndexChanged.connect(self.on_task_selected)
+        self.task_combo.setEnabled(False)  # Disabled until project is selected
         task_layout.addWidget(self.task_combo)
-        layout.addWidget(task_group)
+        selection_layout.addLayout(task_layout)
+
+        layout.addWidget(selection_group)
 
         # Timer mode selection
         mode_group = QGroupBox("Timer Mode")
@@ -151,13 +167,36 @@ class TimerWidget(QWidget):
 
         layout.addStretch()
 
-    def refresh_tasks(self):
-        """Refresh the task list in the combo box."""
+    def refresh_projects(self):
+        """Refresh the project list in the combo box."""
+        self.project_combo.clear()
+        self.project_combo.addItem("Select a project...", None)
+        projects = self.db_service.get_projects()
+        for project in projects:
+            self.project_combo.addItem(project.name, project.id)
+
+    def refresh_tasks(self, project_id: Optional[int] = None):
+        """Refresh the task list in the combo box for the selected project."""
         self.task_combo.clear()
         self.task_combo.addItem("Select a task...", None)
-        tasks = self.db_service.get_tasks()
-        for task in tasks:
-            self.task_combo.addItem(task.name, task)
+
+        if project_id is not None:
+            tasks = self.db_service.get_tasks(project_id=project_id)
+            for task in tasks:
+                self.task_combo.addItem(task.name, task)
+
+    def on_project_selected(self, index: int):
+        """Handle project selection."""
+        if index > 0:
+            self.current_project_id = self.project_combo.itemData(index)
+            self.task_combo.setEnabled(True)
+            self.refresh_tasks(self.current_project_id)
+        else:
+            self.current_project_id = None
+            self.current_task = None
+            self.task_combo.setEnabled(False)
+            self.task_combo.clear()
+            self.task_combo.addItem("Select a task...", None)
 
     def on_task_selected(self, index: int):
         """Handle task selection."""
