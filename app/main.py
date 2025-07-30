@@ -25,7 +25,7 @@ def main():
     app = QApplication(sys.argv)
 
     # Apply dark theme to the entire application
-    DarkTheme.apply_to_application(app)
+    # DarkTheme.apply_to_application(app)
 
     # Initialize database and services
     db_service = DatabaseService()
