@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QLineEdit,
     QInputDialog,
+    QCheckBox,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
@@ -353,6 +354,18 @@ class MainWindow(QMainWindow):
         theme_layout.addWidget(self.theme_button)
         theme_layout.addStretch()
 
+        # Add window behavior settings
+        window_layout = QHBoxLayout()
+        window_label = QLabel("Always open in maximized mode:")
+        self.maximized_checkbox = QCheckBox()
+        self.maximized_checkbox.setChecked(
+            self.db_service.get_config("always_maximized", "true").lower() == "true"
+        )
+        self.maximized_checkbox.toggled.connect(self.on_maximized_setting_changed)
+        window_layout.addWidget(window_label)
+        window_layout.addWidget(self.maximized_checkbox)
+        window_layout.addStretch()
+
         # Add settings controls
         clear_data_btn = QPushButton("Clear All Data")
         clear_data_btn.clicked.connect(self.clear_all_data)
@@ -363,6 +376,8 @@ class MainWindow(QMainWindow):
         # Add widgets to layout
         layout.addWidget(QLabel("Appearance"))
         layout.addLayout(theme_layout)
+        layout.addWidget(QLabel("Window Behavior"))
+        layout.addLayout(window_layout)
         layout.addWidget(QLabel("Database Settings"))
         layout.addWidget(clear_data_btn)
         layout.addWidget(reset_data_btn)
@@ -451,6 +466,10 @@ class MainWindow(QMainWindow):
 
         # Refresh charts to update their appearance
         self.refresh_charts()
+
+    def on_maximized_setting_changed(self, checked: bool):
+        """Handle changes to the maximized setting."""
+        self.db_service.set_config("always_maximized", "true" if checked else "false")
 
     def refresh_data(self):
         """Refresh all data displays."""

@@ -40,7 +40,15 @@ def main():
 
     # Create main window with services
     window = MainWindow(db_service, analytics_service, timer_controller)
-    window.show()
+
+    # Check if window should be maximized
+    always_maximized = (
+        db_service.get_config("always_maximized", "true").lower() == "true"
+    )
+    if always_maximized:
+        window.showMaximized()
+    else:
+        window.show()
 
     sys.exit(app.exec())
 

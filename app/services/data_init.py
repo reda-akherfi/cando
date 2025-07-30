@@ -19,6 +19,9 @@ class DataInitializer:
 
     def initialize_sample_data(self):
         """Initialize the database with sample data."""
+        # Initialize default configuration
+        self.initialize_default_config()
+
         # Create sample projects
         projects = self.create_sample_projects()
 
@@ -252,10 +255,18 @@ class DataInitializer:
                 TagModel,
                 TaskModel,
                 ProjectModel,
+                ConfigModel,
             )
 
             session.query(TimerModel).delete()
             session.query(TagModel).delete()
             session.query(TaskModel).delete()
             session.query(ProjectModel).delete()
+            session.query(ConfigModel).delete()
             session.commit()
+
+    def initialize_default_config(self):
+        """Initialize default configuration settings."""
+        # Set default settings
+        self.db_service.set_config("always_maximized", "true")
+        self.db_service.set_config("theme", "dark")

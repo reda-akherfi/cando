@@ -98,10 +98,21 @@ class TimerModel(Base):
     start = Column(DateTime, nullable=False)
     end = Column(DateTime, nullable=True)
     type = Column(String(20), default="stopwatch")  # stopwatch, countdown, maduro
-    created_at = Column(DateTime, default=func.now())
 
     # Relationships
     task = relationship("TaskModel", back_populates="timers")
+
+
+class ConfigModel(Base):
+    """SQLAlchemy model for application configuration."""
+
+    __tablename__ = "config"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(100), nullable=False, unique=True)
+    value = Column(String(500), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 
 class DatabaseService:
@@ -890,3 +901,28 @@ class DatabaseService:
 
             session.commit()
             return True
+
+    def get_config(self, key: str, default: str = "") -> str:
+        """Get a configuration value by key."""
+        with self.get_session() as session:
+            config = session.query(ConfigModel).filter(ConfigModel.key == key).first()
+            return config.value if config else default
+
+    def set_config(self, key: str, value: str) -> bool:
+        """Set a configuration value by key."""
+        with self.get_session() as session:
+            config = session.query(ConfigModel).filter(ConfigModel.key == key).first()
+            if config:
+                config.value = value
+                config.updated_at = func.now()
+            else:
+                config = ConfigModel(key=key, value=value)
+                session.add(config)
+            session.commit()
+            return True
+
+    def get_all_config(self) -> dict:
+        """Get all configuration values as a dictionary."""
+        with self.get_session() as session:
+            configs = session.query(ConfigModel).all()
+            return {config.key: config.value for config in configs}
