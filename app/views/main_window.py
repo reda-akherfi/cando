@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QScrollArea,
+    QStackedWidget,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
@@ -119,18 +120,57 @@ class MainWindow(QMainWindow):
         self.productivity_chart = DailyProductivityChart()
         self.timer_type_chart = TimerTypeChart()
 
+        # Create navigation controls
+        nav_layout = QHBoxLayout()
+
+        # Left arrow button
+        self.prev_chart_btn = QPushButton("←")
+        self.prev_chart_btn.setMaximumWidth(50)
+        self.prev_chart_btn.clicked.connect(self.show_previous_chart)
+        self.prev_chart_btn.setToolTip("Previous Chart")
+
+        # Chart title label
+        self.chart_title_label = QLabel("Time by Project")
+        self.chart_title_label.setAlignment(Qt.AlignCenter)
+        self.chart_title_label.setStyleSheet(
+            "font-size: 16px; font-weight: bold; margin: 10px;"
+        )
+
+        # Right arrow button
+        self.next_chart_btn = QPushButton("→")
+        self.next_chart_btn.setMaximumWidth(50)
+        self.next_chart_btn.clicked.connect(self.show_next_chart)
+        self.next_chart_btn.setToolTip("Next Chart")
+
+        nav_layout.addWidget(self.prev_chart_btn)
+        nav_layout.addWidget(self.chart_title_label)
+        nav_layout.addWidget(self.next_chart_btn)
+
+        # Create stacked widget for charts
+        self.chart_stack = QStackedWidget()
+        self.chart_stack.addWidget(self.project_chart)
+        self.chart_stack.addWidget(self.productivity_chart)
+        self.chart_stack.addWidget(self.timer_type_chart)
+
+        # Chart titles for navigation
+        self.chart_titles = [
+            "Time by Project",
+            "Daily Productivity",
+            "Timer Type Usage",
+        ]
+        self.current_chart_index = 0
+
         # Create refresh button
         refresh_button = QPushButton("Refresh Charts")
         refresh_button.clicked.connect(self.refresh_charts)
 
         # Add widgets to layout
-        layout.addWidget(QLabel("Time by Project"))
-        layout.addWidget(self.project_chart)
-        layout.addWidget(QLabel("Daily Productivity"))
-        layout.addWidget(self.productivity_chart)
-        layout.addWidget(QLabel("Timer Type Usage"))
-        layout.addWidget(self.timer_type_chart)
+        layout.addLayout(nav_layout)
+        layout.addWidget(self.chart_stack)
         layout.addWidget(refresh_button)
+
+        # Update navigation buttons state
+        self.update_navigation_buttons()
 
     def setup_projects_tab(self):
         """Set up the projects tab for project and task management."""
@@ -565,6 +605,29 @@ class MainWindow(QMainWindow):
         # Update timer type chart
         timer_stats = self.analytics_service.get_timer_type_stats()
         self.timer_type_chart.plot_timer_types(timer_stats)
+
+    def show_previous_chart(self):
+        """Show the previous chart in the sequence."""
+        if self.current_chart_index > 0:
+            self.current_chart_index -= 1
+            self.chart_stack.setCurrentIndex(self.current_chart_index)
+            self.chart_title_label.setText(self.chart_titles[self.current_chart_index])
+            self.update_navigation_buttons()
+
+    def show_next_chart(self):
+        """Show the next chart in the sequence."""
+        if self.current_chart_index < len(self.chart_titles) - 1:
+            self.current_chart_index += 1
+            self.chart_stack.setCurrentIndex(self.current_chart_index)
+            self.chart_title_label.setText(self.chart_titles[self.current_chart_index])
+            self.update_navigation_buttons()
+
+    def update_navigation_buttons(self):
+        """Update the state of navigation buttons based on current chart index."""
+        self.prev_chart_btn.setEnabled(self.current_chart_index > 0)
+        self.next_chart_btn.setEnabled(
+            self.current_chart_index < len(self.chart_titles) - 1
+        )
 
     def on_project_selected(self, project: Project):
         """Handle project selection."""
