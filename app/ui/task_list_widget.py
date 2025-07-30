@@ -181,6 +181,9 @@ class TaskListWidget(QListWidget):
     def __init__(self, parent=None):
         """Initialize the task list widget."""
         super().__init__(parent)
+        self._programmatic_selection = (
+            False  # Flag to prevent signal emission during programmatic selection
+        )
         self.setup_ui()
 
     def setup_ui(self):
@@ -213,10 +216,23 @@ class TaskListWidget(QListWidget):
             return current_item.data(Qt.UserRole)
         return None
 
+    def set_selected_task(self, task: Task):
+        """Set the selected task programmatically."""
+        self._programmatic_selection = True
+        for i in range(self.count()):
+            item = self.item(i)
+            item_task = item.data(Qt.UserRole)
+            if (
+                item_task and item_task.id == task.id
+            ):  # Compare by ID instead of object reference
+                self.setCurrentItem(item)
+                break
+        self._programmatic_selection = False
+
     def on_item_clicked(self, item: QListWidgetItem):
         """Handle item click."""
         task = item.data(Qt.UserRole)
-        if task:
+        if task and not self._programmatic_selection:
             self.task_selected.emit(task)
 
     def show_context_menu(self, position):

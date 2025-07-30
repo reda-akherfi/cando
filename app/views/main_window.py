@@ -71,6 +71,7 @@ class MainWindow(QMainWindow):
         self.analytics_service = analytics_service
         self.timer_controller = timer_controller
         self.is_dark_theme = True  # Track current theme
+        self._sync_in_progress = False  # Flag to prevent recursive synchronization
 
         self.ui = UiMainWindow()
         self.ui.setupUi(self)
@@ -335,6 +336,10 @@ class MainWindow(QMainWindow):
         self.timer_widget.timer_stopped.connect(self.on_timer_stopped)
         self.timer_widget.timer_completed.connect(self.on_timer_completed)
 
+        # Connect synchronization signals
+        self.timer_widget.project_selected.connect(self.on_timer_project_selected)
+        self.timer_widget.task_selected.connect(self.on_timer_task_selected)
+
     def setup_settings_tab(self):
         """Set up the settings tab for application configuration."""
         layout = QVBoxLayout(self.settings_tab)
@@ -530,6 +535,10 @@ class MainWindow(QMainWindow):
 
     def on_project_selected(self, project: Project):
         """Handle project selection."""
+        if self._sync_in_progress:
+            return
+
+        self._sync_in_progress = True
         self.current_project_id = project.id
 
         # Enable task search and filters
@@ -548,6 +557,10 @@ class MainWindow(QMainWindow):
 
         # Refresh task list after everything is set up
         self.refresh_task_list(project.id)
+
+        # Sync with timer tab
+        self.timer_widget.set_current_project(project.id)
+        self._sync_in_progress = False
 
     def refresh_task_list(self, project_id: int):
         """Refresh the task list for a selected project."""
@@ -718,6 +731,85 @@ class MainWindow(QMainWindow):
         """Handle timer completed event."""
         self.refresh_charts()
 
+    def on_timer_project_selected(self, project_id: int):
+        """Handle project selection from timer tab."""
+        if self._sync_in_progress:
+            return
+
+        self._sync_in_progress = True
+        if project_id is not None:
+            # Find the project and select it in the projects tab
+            project = self.db_service.get_project(project_id)
+            if project:
+                # Update the current project selection in projects tab
+                self.current_project_id = project_id
+
+                # Select the project in the project list widget
+                self.project_list_widget.set_selected_project(project)
+
+                self.refresh_task_list(project_id)
+
+                # Enable task controls
+                self.task_search_input.setEnabled(True)
+                self.clear_task_search_btn.setEnabled(True)
+                self.task_status_filter.setEnabled(True)
+                self.task_priority_filter.setEnabled(True)
+                self.task_tag_filter.setEnabled(True)
+
+                # Populate task tag filter
+                self.populate_task_tag_filter(project_id)
+
+                # Clear task search
+                self.task_search_input.clear()
+                self.task_search_results_label.setText("")
+        else:
+            # Clear project selection
+            self.current_project_id = None
+            self.task_search_input.setEnabled(False)
+            self.clear_task_search_btn.setEnabled(False)
+            self.task_status_filter.setEnabled(False)
+            self.task_priority_filter.setEnabled(False)
+            self.task_tag_filter.setEnabled(False)
+            self.add_task_btn.setEnabled(False)
+
+            # Clear task list
+            self.task_list_widget.clear()
+            self.task_search_results_label.setText("")
+        self._sync_in_progress = False
+
+    def on_timer_task_selected(self, task: Task):
+        """Handle task selection from timer tab."""
+        if self._sync_in_progress:
+            return
+
+        self._sync_in_progress = True
+        if task is not None:
+            # First ensure the project is selected in the projects tab
+            if self.current_project_id != task.project_id:
+                # Find and select the project
+                project = self.db_service.get_project(task.project_id)
+                if project:
+                    self.current_project_id = task.project_id
+                    self.refresh_task_list(task.project_id)
+
+                    # Enable task controls
+                    self.task_search_input.setEnabled(True)
+                    self.clear_task_search_btn.setEnabled(True)
+                    self.task_status_filter.setEnabled(True)
+                    self.task_priority_filter.setEnabled(True)
+                    self.task_tag_filter.setEnabled(True)
+
+                    # Populate task tag filter
+                    self.populate_task_tag_filter(task.project_id)
+
+                    # Clear task search
+                    self.task_search_input.clear()
+                    self.task_search_results_label.setText("")
+
+            # Then update the task selection in projects tab
+            self.task_list_widget.set_selected_task(task)
+        self._sync_in_progress = False
+
     def start_timer(self):
         """Start a timer for the first available task."""
         tasks = self.db_service.get_tasks()
@@ -812,9 +904,20 @@ class MainWindow(QMainWindow):
 
     def on_task_selected(self, task: Task):
         """Handle task selection."""
+        if self._sync_in_progress:
+            return
+
+        self._sync_in_progress = True
         # Set the selected task in the timer widget
-        if hasattr(self, "timer_widget"):
-            self.timer_widget.set_current_task(task)
+        if hasattr(self, "timer_widget") and task is not None:
+            # Make sure the project is also selected in timer tab
+            if hasattr(self, "current_project_id") and self.current_project_id:
+                self.timer_widget.set_current_project_and_task(
+                    self.current_project_id, task
+                )
+            else:
+                self.timer_widget.set_current_task(task)
+        self._sync_in_progress = False
 
     def add_sample_task(self):
         """Add a sample task for testing."""

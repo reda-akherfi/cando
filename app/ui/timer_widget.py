@@ -33,6 +33,8 @@ class TimerWidget(QWidget):
     timer_started = Signal(Timer)
     timer_stopped = Signal(Timer)
     timer_completed = Signal(Timer)
+    project_selected = Signal(int)  # Emits project_id
+    task_selected = Signal(Task)  # Emits selected task
 
     def __init__(
         self,
@@ -45,6 +47,7 @@ class TimerWidget(QWidget):
         self.db_service = db_service
         self.current_task: Optional[Task] = None
         self.current_project_id: Optional[int] = None
+        self._sync_in_progress = False  # Flag to prevent recursive synchronization
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_display)
         self.update_timer.start(1000)  # Update every second
@@ -187,23 +190,41 @@ class TimerWidget(QWidget):
 
     def on_project_selected(self, index: int):
         """Handle project selection."""
+        if self._sync_in_progress:
+            return
+
+        self._sync_in_progress = True
         if index > 0:
             self.current_project_id = self.project_combo.itemData(index)
             self.task_combo.setEnabled(True)
             self.refresh_tasks(self.current_project_id)
+            # Emit signal for synchronization
+            self.project_selected.emit(self.current_project_id)
         else:
             self.current_project_id = None
             self.current_task = None
             self.task_combo.setEnabled(False)
             self.task_combo.clear()
             self.task_combo.addItem("Select a task...", None)
+            # Emit signal for synchronization
+            self.project_selected.emit(None)
+        self._sync_in_progress = False
 
     def on_task_selected(self, index: int):
         """Handle task selection."""
+        if self._sync_in_progress:
+            return
+
+        self._sync_in_progress = True
         if index > 0:
             self.current_task = self.task_combo.itemData(index)
+            # Emit signal for synchronization
+            self.task_selected.emit(self.current_task)
         else:
             self.current_task = None
+            # Emit signal for synchronization
+            self.task_selected.emit(None)
+        self._sync_in_progress = False
 
     def on_mode_changed(self, mode: str):
         """Handle timer mode changes."""
@@ -331,8 +352,39 @@ class TimerWidget(QWidget):
 
     def set_current_task(self, task: Task):
         """Set the current task externally."""
+        self._sync_in_progress = True
         self.current_task = task
         for i in range(self.task_combo.count()):
-            if self.task_combo.itemData(i) == task:
+            combo_task = self.task_combo.itemData(i)
+            if (
+                combo_task and combo_task.id == task.id
+            ):  # Compare by ID instead of object reference
                 self.task_combo.setCurrentIndex(i)
                 break
+        self._sync_in_progress = False
+
+    def set_current_project(self, project_id: int):
+        """Set the current project externally."""
+        self._sync_in_progress = True
+        # Find the project in the combo box and select it
+        for i in range(self.project_combo.count()):
+            if self.project_combo.itemData(i) == project_id:
+                self.project_combo.setCurrentIndex(i)
+                # Update internal state without triggering signals
+                self.current_project_id = project_id
+                self.task_combo.setEnabled(True)
+                self.refresh_tasks(project_id)
+                break
+        self._sync_in_progress = False
+
+    def set_current_project_and_task(self, project_id: int, task: Task):
+        """Set both project and task externally."""
+        self._sync_in_progress = True
+        # First set the project
+        self.set_current_project(project_id)
+        # Refresh tasks for the project
+        self.refresh_tasks(project_id)
+        # Then set the task
+        if task:
+            self.set_current_task(task)
+        self._sync_in_progress = False

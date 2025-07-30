@@ -184,6 +184,9 @@ class ProjectListWidget(QListWidget):
     def __init__(self, parent=None):
         """Initialize the project list widget."""
         super().__init__(parent)
+        self._programmatic_selection = (
+            False  # Flag to prevent signal emission during programmatic selection
+        )
         self.setup_ui()
 
     def setup_ui(self):
@@ -216,10 +219,23 @@ class ProjectListWidget(QListWidget):
             return current_item.data(Qt.UserRole)
         return None
 
+    def set_selected_project(self, project: Project):
+        """Set the selected project programmatically."""
+        self._programmatic_selection = True
+        for i in range(self.count()):
+            item = self.item(i)
+            item_project = item.data(Qt.UserRole)
+            if (
+                item_project and item_project.id == project.id
+            ):  # Compare by ID instead of object reference
+                self.setCurrentItem(item)
+                break
+        self._programmatic_selection = False
+
     def on_item_clicked(self, item: QListWidgetItem):
         """Handle item click."""
         project = item.data(Qt.UserRole)
-        if project:
+        if project and not self._programmatic_selection:
             self.project_selected.emit(project)
 
     def show_context_menu(self, position):
