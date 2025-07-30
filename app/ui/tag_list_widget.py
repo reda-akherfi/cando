@@ -52,7 +52,9 @@ class TagItemWidget(QWidget):
 
         name_label = QLabel(name_text)
         name_label.setFont(QFont("Arial", 10, QFont.Bold))
-        name_label.setStyleSheet("color: #ffffff;")
+        # Use theme-aware color instead of hardcoded white
+        palette = self.palette()
+        name_label.setStyleSheet(f"color: {palette.color(QPalette.Text).name()};")
         name_label.setTextFormat(Qt.RichText)
         layout.addWidget(name_label)
 
@@ -61,7 +63,9 @@ class TagItemWidget(QWidget):
         # Usage count
         usage_label = QLabel(f"Used {self.tag.usage_count} times")
         usage_label.setFont(QFont("Arial", 8))
-        usage_label.setStyleSheet("color: #888888;")
+        # Use theme-aware secondary text color
+        palette = self.palette()
+        usage_label.setStyleSheet(f"color: {palette.color(QPalette.Mid).name()};")
         layout.addWidget(usage_label)
 
         # Linked items info

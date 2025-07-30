@@ -75,7 +75,9 @@ class TaskItemWidget(QWidget):
 
             desc_label = QLabel(desc_text)
             desc_label.setFont(QFont("Arial", 8))
-            desc_label.setStyleSheet("color: #888888;")
+            # Use theme-aware secondary text color
+            palette = self.palette()
+            desc_label.setStyleSheet(f"color: {palette.color(QPalette.Mid).name()};")
             desc_label.setTextFormat(Qt.RichText)
             info_layout.addWidget(desc_label)
 
@@ -159,7 +161,9 @@ class TaskItemWidget(QWidget):
         elif self.task.is_overdue:
             return "#dc3545"  # Red for overdue
         else:
-            return "#ffffff"  # White for active
+            # Use theme-aware color instead of hardcoded white
+            palette = self.palette()
+            return palette.color(QPalette.Text).name()
 
 
 class TaskListWidget(QListWidget):

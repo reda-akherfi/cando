@@ -27,7 +27,7 @@ from app.ui.chart_widget import (
     DailyProductivityChart,
     TimerTypeChart,
 )
-from app.ui.theme import DarkTheme
+from app.ui.theme import DarkTheme, LightTheme
 from app.ui.project_dialog import ProjectDialog
 from app.ui.project_list_widget import ProjectListWidget
 from app.ui.task_dialog import TaskDialog
@@ -372,9 +372,8 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
 
         if self.is_dark_theme:
-            # Switch to light theme (reset to default)
-            app.setPalette(app.style().standardPalette())
-            app.setStyleSheet("")
+            # Switch to light theme
+            LightTheme.apply_to_application(app)
             self.theme_button.setText("Switch to Dark Mode")
             self.is_dark_theme = False
         else:
