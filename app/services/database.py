@@ -99,7 +99,16 @@ class TimerModel(Base):
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     start = Column(DateTime, nullable=False)
     end = Column(DateTime, nullable=True)
-    type = Column(String(20), default="stopwatch")  # stopwatch, countdown, maduro
+    type = Column(String(20), default="stopwatch")  # stopwatch, countdown, pomodoro
+    duration = Column(
+        Integer, nullable=True
+    )  # Duration in seconds for countdown/pomodoro
+    pomodoro_session_type = Column(
+        String(20), nullable=True
+    )  # work, short_break, long_break
+    pomodoro_session_number = Column(
+        Integer, nullable=True
+    )  # Session number in the cycle
 
     # Relationships
     task = relationship("TaskModel", back_populates="timers")
@@ -786,7 +795,7 @@ class DatabaseService:
                     # Remove old tags
                     current_tags = self._get_task_tags(session, task_id)
                     for tag in current_tags:
-                        self.remove_task_tag(task_id, tag)
+                        self.remove_task_tag(task_id, tag["name"])
                     # Add new tags
                     for tag in tags:
                         self.add_task_tag(task_id, tag)
@@ -881,6 +890,9 @@ class DatabaseService:
             start=db_timer.start,
             end=db_timer.end,
             type=db_timer.type,
+            duration=db_timer.duration,
+            pomodoro_session_type=db_timer.pomodoro_session_type,
+            pomodoro_session_number=db_timer.pomodoro_session_number,
         )
 
     def get_project_tags(self, project_id: int) -> List[dict]:

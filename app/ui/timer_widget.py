@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QSpinBox,
     QMessageBox,
+    QCheckBox,
 )
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtGui import QFont
@@ -51,6 +52,13 @@ class TimerWidget(QWidget):
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_display)
         self.update_timer.start(1000)  # Update every second
+
+        # Pomodoro settings
+        self.work_duration = 25  # minutes
+        self.short_break_duration = 5  # minutes
+        self.long_break_duration = 15  # minutes
+        self.autostart_breaks = True
+        self.autostart_work = True
 
         self.setup_ui()
         self.refresh_projects()
@@ -107,6 +115,53 @@ class TimerWidget(QWidget):
         countdown_layout.addWidget(self.seconds_spin, 1, 1)
         layout.addWidget(self.countdown_group)
         self.countdown_group.setVisible(False)
+
+        # Pomodoro settings
+        self.pomodoro_group = QGroupBox("Pomodoro Settings")
+        pomodoro_layout = QGridLayout(self.pomodoro_group)
+
+        # Work duration
+        pomodoro_layout.addWidget(QLabel("Work Duration (min):"), 0, 0)
+        self.work_duration_spin = QSpinBox()
+        self.work_duration_spin.setRange(1, 120)
+        self.work_duration_spin.setValue(self.work_duration)
+        self.work_duration_spin.valueChanged.connect(self.on_work_duration_changed)
+        pomodoro_layout.addWidget(self.work_duration_spin, 0, 1)
+
+        # Short break duration
+        pomodoro_layout.addWidget(QLabel("Short Break (min):"), 1, 0)
+        self.short_break_spin = QSpinBox()
+        self.short_break_spin.setRange(1, 30)
+        self.short_break_spin.setValue(self.short_break_duration)
+        self.short_break_spin.valueChanged.connect(self.on_short_break_changed)
+        pomodoro_layout.addWidget(self.short_break_spin, 1, 1)
+
+        # Long break duration
+        pomodoro_layout.addWidget(QLabel("Long Break (min):"), 2, 0)
+        self.long_break_spin = QSpinBox()
+        self.long_break_spin.setRange(5, 60)
+        self.long_break_spin.setValue(self.long_break_duration)
+        self.long_break_spin.valueChanged.connect(self.on_long_break_changed)
+        pomodoro_layout.addWidget(self.long_break_spin, 2, 1)
+
+        # Autostart options
+        pomodoro_layout.addWidget(QLabel("Autostart Options:"), 3, 0)
+        autostart_layout = QVBoxLayout()
+
+        self.autostart_breaks_checkbox = QCheckBox("Auto-start breaks")
+        self.autostart_breaks_checkbox.setChecked(self.autostart_breaks)
+        self.autostart_breaks_checkbox.toggled.connect(self.on_autostart_breaks_changed)
+        autostart_layout.addWidget(self.autostart_breaks_checkbox)
+
+        self.autostart_work_checkbox = QCheckBox("Auto-start work sessions")
+        self.autostart_work_checkbox.setChecked(self.autostart_work)
+        self.autostart_work_checkbox.toggled.connect(self.on_autostart_work_changed)
+        autostart_layout.addWidget(self.autostart_work_checkbox)
+
+        pomodoro_layout.addLayout(autostart_layout, 3, 1)
+
+        layout.addWidget(self.pomodoro_group)
+        self.pomodoro_group.setVisible(False)
 
         # Timer display
         display_group = QGroupBox("Timer")
@@ -228,14 +283,39 @@ class TimerWidget(QWidget):
 
     def on_mode_changed(self, mode: str):
         """Handle timer mode changes."""
-        self.countdown_group.setVisible(mode in ["Countdown", "Pomodoro"])
+        self.countdown_group.setVisible(mode in ["Countdown"])
+        self.pomodoro_group.setVisible(mode == "Pomodoro")
         self.progress_bar.setVisible(mode in ["Countdown", "Pomodoro"])
+
         if mode == "Pomodoro":
-            self.minutes_spin.setValue(25)
+            # Set default Pomodoro duration
+            self.minutes_spin.setValue(self.work_duration)
             self.seconds_spin.setValue(0)
         elif mode == "Countdown":
             self.minutes_spin.setValue(30)
             self.seconds_spin.setValue(0)
+
+    def on_work_duration_changed(self, value: int):
+        """Handle work duration change."""
+        self.work_duration = value
+        if self.mode_combo.currentText() == "Pomodoro":
+            self.minutes_spin.setValue(value)
+
+    def on_short_break_changed(self, value: int):
+        """Handle short break duration change."""
+        self.short_break_duration = value
+
+    def on_long_break_changed(self, value: int):
+        """Handle long break duration change."""
+        self.long_break_duration = value
+
+    def on_autostart_breaks_changed(self, checked: bool):
+        """Handle autostart breaks setting change."""
+        self.autostart_breaks = checked
+
+    def on_autostart_work_changed(self, checked: bool):
+        """Handle autostart work setting change."""
+        self.autostart_work = checked
 
     def start_timer(self):
         """Start the timer."""
@@ -244,20 +324,38 @@ class TimerWidget(QWidget):
             return
 
         mode = self.mode_combo.currentText().lower()
-        duration = None
-        if mode in ["countdown", "pomodoro"]:
+
+        if mode == "pomodoro":
+            # Start a Pomodoro work session
+            timer = self.timer_controller.start_pomodoro_session(
+                self.current_task.id,
+                "work",
+                work_duration=self.work_duration,
+                short_break_duration=self.short_break_duration,
+                long_break_duration=self.long_break_duration,
+            )
+        elif mode == "countdown":
             duration = self.minutes_spin.value() * 60 + self.seconds_spin.value()
             if duration <= 0:
                 QMessageBox.warning(
                     self, "Invalid Duration", "Please set a valid duration."
                 )
                 return
+            timer = self.timer_controller.start_timer(
+                self.current_task.id, mode, duration=duration
+            )
+        else:  # stopwatch
+            timer = self.timer_controller.start_timer(self.current_task.id, mode)
 
-        timer = self.timer_controller.start_timer(self.current_task.id, mode)
         if timer:
             self.start_button.setEnabled(False)
             self.stop_button.setEnabled(True)
-            self.status_label.setText(f"Running: {self.current_task.name}")
+
+            if mode == "pomodoro":
+                self.status_label.setText(f"Work Session: {self.current_task.name}")
+            else:
+                self.status_label.setText(f"Running: {self.current_task.name}")
+
             self.timer_started.emit(timer)
 
     def stop_timer(self):
@@ -282,34 +380,145 @@ class TimerWidget(QWidget):
         active_timer = self.timer_controller.get_active_timer()
 
         if active_timer:
-            elapsed = datetime.now() - active_timer.start
-            hours, remainder = divmod(elapsed.total_seconds(), 3600)
-            minutes, seconds = divmod(remainder, 60)
-
-            self.time_label.setText(
-                f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
-            )
-
             mode = self.mode_combo.currentText().lower()
-            if mode in ["countdown", "pomodoro"]:
-                total_duration = (
-                    self.minutes_spin.value() * 60 + self.seconds_spin.value()
-                )
-                if total_duration > 0:
-                    progress = min(
-                        100, (elapsed.total_seconds() / total_duration) * 100
-                    )
-                    self.progress_bar.setValue(int(progress))
 
-                    if elapsed.total_seconds() >= total_duration:
-                        self.stop_timer()
-                        self.timer_completed.emit(active_timer)
-                        QMessageBox.information(
-                            self, "Timer Complete", "Your timer has finished!"
+            if mode == "pomodoro" and active_timer.duration:
+                # Pomodoro countdown mode
+                elapsed = datetime.now() - active_timer.start
+                remaining = active_timer.duration - elapsed.total_seconds()
+
+                if remaining <= 0:
+                    # Timer completed
+                    self.stop_timer()
+                    self.timer_completed.emit(active_timer)
+
+                    # Handle Pomodoro session completion
+                    self.handle_pomodoro_completion(active_timer)
+                    return
+
+                # Display remaining time
+                hours, remainder = divmod(remaining, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                self.time_label.setText(
+                    f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+                )
+
+                # Update progress bar
+                progress = (
+                    (active_timer.duration - remaining) / active_timer.duration
+                ) * 100
+                self.progress_bar.setValue(int(progress))
+
+                # Update status
+                session_type = active_timer.pomodoro_session_type
+                if session_type == "work":
+                    self.status_label.setText(f"Work Session: {self.current_task.name}")
+                elif session_type == "short_break":
+                    self.status_label.setText("Short Break")
+                elif session_type == "long_break":
+                    self.status_label.setText("Long Break")
+
+            else:
+                # Stopwatch or countdown mode
+                elapsed = datetime.now() - active_timer.start
+                hours, remainder = divmod(elapsed.total_seconds(), 3600)
+                minutes, seconds = divmod(remainder, 60)
+
+                self.time_label.setText(
+                    f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+                )
+
+                if mode == "countdown" and active_timer.duration:
+                    if active_timer.duration > 0:
+                        progress = min(
+                            100, (elapsed.total_seconds() / active_timer.duration) * 100
                         )
+                        self.progress_bar.setValue(int(progress))
+
+                        if elapsed.total_seconds() >= active_timer.duration:
+                            self.stop_timer()
+                            self.timer_completed.emit(active_timer)
+                            QMessageBox.information(
+                                self, "Timer Complete", "Your timer has finished!"
+                            )
         else:
             self.time_label.setText("00:00:00")
             self.progress_bar.setValue(0)
+
+    def handle_pomodoro_completion(self, completed_timer: Timer):
+        """Handle Pomodoro session completion and autostart logic."""
+        session_type = completed_timer.pomodoro_session_type
+
+        if session_type == "work":
+            # Work session completed
+            QMessageBox.information(
+                self,
+                "Work Session Complete!",
+                f"Great job! You've completed work session #{completed_timer.pomodoro_session_number}.\n\n"
+                "Time for a break!",
+            )
+
+            if self.autostart_breaks:
+                # Auto-start break
+                next_session_type = (
+                    self.timer_controller.get_next_pomodoro_session_type()
+                )
+                if next_session_type == "short_break":
+                    self.start_break_session("short_break")
+                else:
+                    self.start_break_session("long_break")
+
+        elif session_type in ["short_break", "long_break"]:
+            # Break completed
+            break_type = "Short" if session_type == "short_break" else "Long"
+            QMessageBox.information(
+                self,
+                f"{break_type} Break Complete!",
+                f"Break time is over. Ready to get back to work?",
+            )
+
+            if self.autostart_work:
+                # Auto-start next work session
+                self.start_work_session()
+
+    def start_work_session(self):
+        """Start a new Pomodoro work session."""
+        if not self.current_task:
+            QMessageBox.warning(self, "No Task Selected", "Please select a task first.")
+            return
+
+        timer = self.timer_controller.start_pomodoro_session(
+            self.current_task.id,
+            "work",
+            work_duration=self.work_duration,
+            short_break_duration=self.short_break_duration,
+            long_break_duration=self.long_break_duration,
+        )
+        if timer:
+            self.start_button.setEnabled(False)
+            self.stop_button.setEnabled(True)
+            self.status_label.setText(f"Work Session: {self.current_task.name}")
+            self.timer_started.emit(timer)
+
+    def start_break_session(self, break_type: str):
+        """Start a Pomodoro break session."""
+        if not self.current_task:
+            QMessageBox.warning(self, "No Task Selected", "Please select a task first.")
+            return
+
+        timer = self.timer_controller.start_pomodoro_session(
+            self.current_task.id,
+            break_type,
+            work_duration=self.work_duration,
+            short_break_duration=self.short_break_duration,
+            long_break_duration=self.long_break_duration,
+        )
+        if timer:
+            self.start_button.setEnabled(False)
+            self.stop_button.setEnabled(True)
+            break_label = "Short Break" if break_type == "short_break" else "Long Break"
+            self.status_label.setText(break_label)
+            self.timer_started.emit(timer)
 
     def refresh_history(self):
         """Refresh the timer history list."""
@@ -321,7 +530,21 @@ class TimerWidget(QWidget):
                     duration = timer.end - timer.start
                     hours, remainder = divmod(duration.total_seconds(), 3600)
                     minutes, seconds = divmod(remainder, 60)
-                    item_text = f"{timer.start.strftime('%H:%M')} - {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d} ({timer.type})"
+
+                    # Format timer information
+                    time_str = f"{timer.start.strftime('%H:%M')} - {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+
+                    if timer.type == "pomodoro" and timer.pomodoro_session_type:
+                        session_info = (
+                            f" ({timer.pomodoro_session_type.replace('_', ' ').title()}"
+                        )
+                        if timer.pomodoro_session_number:
+                            session_info += f" #{timer.pomodoro_session_number}"
+                        session_info += ")"
+                        item_text = f"{time_str}{session_info}"
+                    else:
+                        item_text = f"{time_str} ({timer.type})"
+
                     item = QListWidgetItem(item_text)
                     self.history_list.addItem(item)
 
@@ -349,6 +572,13 @@ class TimerWidget(QWidget):
             self.avg_session_label.setText(f"{int(avg_minutes)}m")
         else:
             self.avg_session_label.setText("0m")
+
+        # Update Pomodoro statistics if we have a current task
+        if self.current_task:
+            pomodoro_stats = self.timer_controller.get_pomodoro_stats(
+                self.current_task.id
+            )
+            # You could add more Pomodoro-specific UI elements here to display these stats
 
     def set_current_task(self, task: Task):
         """Set the current task externally."""
