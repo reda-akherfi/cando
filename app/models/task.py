@@ -27,7 +27,7 @@ class Task:
     due_date: Optional[datetime] = None
     estimated_hours: Optional[float] = None
     priority: str = "medium"  # low, medium, high, urgent
-    tags: List[str] = field(default_factory=list)
+    tags: List[dict] = field(default_factory=list)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

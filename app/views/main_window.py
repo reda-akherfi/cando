@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QInputDialog,
     QCheckBox,
+    QDialog,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
@@ -33,6 +34,7 @@ from app.ui.project_dialog import ProjectDialog
 from app.ui.project_list_widget import ProjectListWidget
 from app.ui.task_dialog import TaskDialog
 from app.ui.task_list_widget import TaskListWidget
+from app.ui.tag_dialog import TagDialog
 from app.ui.tag_list_widget import TagListWidget
 from app.ui.timer_widget import TimerWidget
 from app.ui.ui_main import UiMainWindow
@@ -505,7 +507,11 @@ class MainWindow(QMainWindow):
 
         # Filter by tag
         if tag_filter != "All":
-            filtered_projects = [p for p in filtered_projects if tag_filter in p.tags]
+            filtered_projects = [
+                p
+                for p in filtered_projects
+                if any(tag["name"] == tag_filter for tag in p.tags)
+            ]
 
         # Apply fuzzy search if there's a search query
         if search_text:
@@ -617,7 +623,11 @@ class MainWindow(QMainWindow):
 
         # Filter by tag
         if tag_filter != "All":
-            filtered_tasks = [t for t in filtered_tasks if tag_filter in t.tags]
+            filtered_tasks = [
+                t
+                for t in filtered_tasks
+                if any(tag["name"] == tag_filter for tag in t.tags)
+            ]
 
         # Apply fuzzy search if there's a search query
         if search_text:
@@ -1072,23 +1082,29 @@ class MainWindow(QMainWindow):
         pass
 
     def edit_tag(self, tag: Tag):
-        """Edit the name of a tag."""
-        new_name, ok = QInputDialog.getText(
-            self, "Edit Tag", "Enter new tag name:", QLineEdit.Normal, tag.name
-        )
-        if ok and new_name and new_name.strip():
-            new_name = new_name.strip()
-            if self.db_service.update_tag(tag.name, new_name):
-                self.refresh_tags()
-                QMessageBox.information(
-                    self, "Success", f"Tag '{tag.name}' updated to '{new_name}'"
-                )
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Error",
-                    f"Tag '{new_name}' already exists or could not be updated.",
-                )
+        """Edit the tag."""
+        dialog = TagDialog(tag.name, tag.color, tag.description, parent=self)
+        if dialog.exec() == QDialog.Accepted:
+            tag_data = dialog.get_tag_data()
+            if tag_data["name"]:
+                if self.db_service.update_tag(
+                    tag.name,
+                    tag_data["name"],
+                    tag_data["color"],
+                    tag_data["description"],
+                ):
+                    self.refresh_tags()
+                    QMessageBox.information(
+                        self,
+                        "Success",
+                        f"Tag '{tag.name}' updated to '{tag_data['name']}'",
+                    )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Error",
+                        f"Tag '{tag_data['name']}' already exists or could not be updated.",
+                    )
 
     def delete_tag(self, tag: Tag):
         """Delete a tag."""
@@ -1104,18 +1120,21 @@ class MainWindow(QMainWindow):
 
     def add_tag(self):
         """Add a new tag."""
-        new_tag, ok = QInputDialog.getText(
-            self, "Add Tag", "Enter new tag name:", QLineEdit.Normal
-        )
-        if ok and new_tag and new_tag.strip():
-            new_tag = new_tag.strip()
-            if self.db_service.add_tag(new_tag):
-                self.refresh_tags()
-                QMessageBox.information(
-                    self, "Success", f"Tag '{new_tag}' added successfully!"
-                )
-            else:
-                QMessageBox.warning(self, "Error", f"Tag '{new_tag}' already exists.")
+        dialog = TagDialog(parent=self)
+        if dialog.exec() == QDialog.Accepted:
+            tag_data = dialog.get_tag_data()
+            if tag_data["name"]:
+                if self.db_service.add_tag(
+                    tag_data["name"], tag_data["color"], tag_data["description"]
+                ):
+                    self.refresh_tags()
+                    QMessageBox.information(
+                        self, "Success", f"Tag '{tag_data['name']}' added successfully!"
+                    )
+                else:
+                    QMessageBox.warning(
+                        self, "Error", f"Tag '{tag_data['name']}' already exists."
+                    )
 
     def populate_project_tag_filter(self):
         """Populate the project tag filter with all available tags."""
@@ -1127,7 +1146,7 @@ class MainWindow(QMainWindow):
         all_tags = set()
         for project in all_projects:
             if project.tags:
-                all_tags.update(project.tags)
+                all_tags.update([tag["name"] for tag in project.tags])
 
         # Add tags to filter
         for tag in sorted(all_tags):
@@ -1143,7 +1162,7 @@ class MainWindow(QMainWindow):
         all_tags = set()
         for task in all_tasks:
             if task.tags:
-                all_tags.update(task.tags)
+                all_tags.update([tag["name"] for tag in task.tags])
 
         # Add tags to filter
         for tag in sorted(all_tags):

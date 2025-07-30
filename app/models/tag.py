@@ -17,6 +17,8 @@ class Tag:
 
     id: Optional[int] = None
     name: str = ""
+    color: str = "#FF5733"  # Default color
+    description: str = ""
     usage_count: int = 0
     linked_projects: List[int] = field(default_factory=list)
     linked_tasks: List[int] = field(default_factory=list)

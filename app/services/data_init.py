@@ -48,6 +48,15 @@ class DataInitializer:
         self.db_service.add_project_tag(web_project.id, "web")
         self.db_service.add_project_tag(web_project.id, "design")
         self.db_service.add_project_tag(web_project.id, "frontend")
+
+        # Set colors and descriptions for tags
+        self.db_service.update_tag("web", "web", "#007bff", "Web development related")
+        self.db_service.update_tag(
+            "design", "design", "#28a745", "Design and UI/UX work"
+        )
+        self.db_service.update_tag(
+            "frontend", "frontend", "#fd7e14", "Frontend development"
+        )
         projects.append(web_project)
 
         # Project 2: Mobile App
@@ -62,6 +71,15 @@ class DataInitializer:
         self.db_service.add_project_tag(mobile_project.id, "mobile")
         self.db_service.add_project_tag(mobile_project.id, "react-native")
         self.db_service.add_project_tag(mobile_project.id, "cross-platform")
+
+        # Set colors and descriptions for tags
+        self.db_service.update_tag("mobile", "mobile", "#e83e8c", "Mobile development")
+        self.db_service.update_tag(
+            "react-native", "react-native", "#17a2b8", "React Native framework"
+        )
+        self.db_service.update_tag(
+            "cross-platform", "cross-platform", "#6f42c1", "Cross-platform development"
+        )
         projects.append(mobile_project)
 
         # Project 3: Database Migration
@@ -76,6 +94,15 @@ class DataInitializer:
         self.db_service.add_project_tag(db_project.id, "database")
         self.db_service.add_project_tag(db_project.id, "migration")
         self.db_service.add_project_tag(db_project.id, "cloud")
+
+        # Set colors and descriptions for tags
+        self.db_service.update_tag(
+            "database", "database", "#dc3545", "Database related work"
+        )
+        self.db_service.update_tag(
+            "migration", "migration", "#ffc107", "Data migration tasks"
+        )
+        self.db_service.update_tag("cloud", "cloud", "#20c997", "Cloud infrastructure")
         projects.append(db_project)
 
         # Project 4: Documentation
@@ -89,6 +116,12 @@ class DataInitializer:
         )
         self.db_service.add_project_tag(doc_project.id, "documentation")
         self.db_service.add_project_tag(doc_project.id, "api")
+
+        # Set colors and descriptions for tags
+        self.db_service.update_tag(
+            "documentation", "documentation", "#6c757d", "Documentation work"
+        )
+        self.db_service.update_tag("api", "api", "#fd7e14", "API development")
         projects.append(doc_project)
 
         # Project 5: Testing Framework
@@ -103,6 +136,15 @@ class DataInitializer:
         self.db_service.add_project_tag(test_project.id, "testing")
         self.db_service.add_project_tag(test_project.id, "automation")
         self.db_service.add_project_tag(test_project.id, "qa")
+
+        # Set colors and descriptions for tags
+        self.db_service.update_tag(
+            "testing", "testing", "#28a745", "Testing and QA work"
+        )
+        self.db_service.update_tag(
+            "automation", "automation", "#17a2b8", "Automated testing"
+        )
+        self.db_service.update_tag("qa", "qa", "#6f42c1", "Quality assurance")
         projects.append(test_project)
 
         # Project 6: Completed Project
@@ -117,6 +159,14 @@ class DataInitializer:
         )
         self.db_service.add_project_tag(completed_project.id, "security")
         self.db_service.add_project_tag(completed_project.id, "audit")
+
+        # Set colors and descriptions for tags
+        self.db_service.update_tag(
+            "security", "security", "#dc3545", "Security related work"
+        )
+        self.db_service.update_tag(
+            "audit", "audit", "#fd7e14", "Audit and review tasks"
+        )
         projects.append(completed_project)
 
         return projects
@@ -222,6 +272,24 @@ class DataInitializer:
             else:
                 self.db_service.add_task_tag(task.id, "general")
                 self.db_service.add_task_tag(task.id, "planning")
+
+            # Set colors and descriptions for additional task tags
+            self.db_service.update_tag(
+                "app", "app", "#e83e8c", "Application development"
+            )
+            self.db_service.update_tag(
+                "backend", "backend", "#6c757d", "Backend development"
+            )
+            self.db_service.update_tag(
+                "marketing", "marketing", "#20c997", "Marketing activities"
+            )
+            self.db_service.update_tag(
+                "content", "content", "#fd7e14", "Content creation"
+            )
+            self.db_service.update_tag("general", "general", "#6c757d", "General tasks")
+            self.db_service.update_tag(
+                "planning", "planning", "#17a2b8", "Planning and organization"
+            )
 
     def create_sample_timers(self):
         """Create sample timer data."""

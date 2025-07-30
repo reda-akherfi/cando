@@ -45,6 +45,18 @@ class TagItemWidget(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
+        # Tag color indicator
+        color_frame = QFrame()
+        color_frame.setFixedSize(16, 16)
+        color_frame.setStyleSheet(
+            f"background-color: {self.tag.color}; border-radius: 8px; border: 1px solid #ccc;"
+        )
+        layout.addWidget(color_frame)
+
+        # Tag info layout
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+
         # Tag name with search highlighting
         name_text = self.tag.name
         if self.search_query:
@@ -56,7 +68,18 @@ class TagItemWidget(QWidget):
         palette = self.palette()
         name_label.setStyleSheet(f"color: {palette.color(QPalette.Text).name()};")
         name_label.setTextFormat(Qt.RichText)
-        layout.addWidget(name_label)
+        info_layout.addWidget(name_label)
+
+        # Tag description
+        if self.tag.description:
+            desc_label = QLabel(self.tag.description)
+            desc_label.setFont(QFont("Arial", 8))
+            # Use theme-aware secondary text color
+            palette = self.palette()
+            desc_label.setStyleSheet(f"color: {palette.color(QPalette.Mid).name()};")
+            info_layout.addWidget(desc_label)
+
+        layout.addLayout(info_layout)
 
         layout.addStretch()
 

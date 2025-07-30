@@ -85,6 +85,8 @@ class TagModel(Base):
     name = Column(String(100), nullable=False)
     linked_type = Column(String(20), nullable=False)  # 'project' or 'task'
     linked_id = Column(Integer, nullable=False)
+    color = Column(String(7), nullable=True)  # Hex color code (e.g., #FF5733)
+    description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
 
@@ -477,13 +479,16 @@ class DatabaseService:
     def get_tags(self) -> List[Tag]:
         """Get all tags with usage statistics."""
         with self.get_session() as session:
-            # Get all unique tag names
-            tag_names = (
-                session.query(TagModel.name).distinct().order_by(TagModel.name).all()
+            # Get all unique tag names with their colors and descriptions
+            tag_info = (
+                session.query(TagModel.name, TagModel.color, TagModel.description)
+                .distinct()
+                .order_by(TagModel.name)
+                .all()
             )
 
             tags = []
-            for (tag_name,) in tag_names:
+            for tag_name, color, description in tag_info:
                 # Count usage for this tag
                 usage_count = (
                     session.query(TagModel).filter(TagModel.name == tag_name).count()
@@ -507,6 +512,8 @@ class DatabaseService:
                 tag = Tag(
                     id=len(tags) + 1,  # Simple ID for display
                     name=tag_name,
+                    color=color or "#FF5733",  # Default color if None
+                    description=description or "",
                     usage_count=usage_count,
                     linked_projects=[p[0] for p in linked_projects],
                     linked_tasks=[t[0] for t in linked_tasks],
@@ -515,7 +522,9 @@ class DatabaseService:
 
             return tags
 
-    def add_tag(self, tag_name: str) -> bool:
+    def add_tag(
+        self, tag_name: str, color: str = "#FF5733", description: str = ""
+    ) -> bool:
         """Add a new tag (if it doesn't exist)."""
         with self.get_session() as session:
             # Check if tag already exists
@@ -528,21 +537,29 @@ class DatabaseService:
 
             # Create a dummy tag entry to establish the tag
             # This will be replaced when the tag is actually used
-            dummy_tag = TagModel(name=tag_name, linked_type="dummy", linked_id=0)
+            dummy_tag = TagModel(
+                name=tag_name,
+                linked_type="dummy",
+                linked_id=0,
+                color=color,
+                description=description,
+            )
             session.add(dummy_tag)
             session.commit()
             return True
 
-    def update_tag(self, old_name: str, new_name: str) -> bool:
-        """Update a tag name across all its usages."""
+    def update_tag(
+        self, old_name: str, new_name: str, color: str = None, description: str = None
+    ) -> bool:
+        """Update a tag name, color, and description across all its usages."""
         with self.get_session() as session:
-            # Check if new name already exists
-            existing_tag = (
-                session.query(TagModel).filter(TagModel.name == new_name).first()
-            )
-
-            if existing_tag:
-                return False  # New name already exists
+            # Only check for name conflicts if the name is actually being changed
+            if old_name != new_name:
+                existing_tag = (
+                    session.query(TagModel).filter(TagModel.name == new_name).first()
+                )
+                if existing_tag:
+                    return False  # New name already exists
 
             # Update all instances of the old tag name
             tags_to_update = (
@@ -551,6 +568,10 @@ class DatabaseService:
 
             for tag in tags_to_update:
                 tag.name = new_name
+                if color is not None:
+                    tag.color = color
+                if description is not None:
+                    tag.description = description
 
             session.commit()
             return True
@@ -584,17 +605,24 @@ class DatabaseService:
 
             return [(name, count) for name, count in tag_counts]
 
-    def _get_project_tags(self, session, project_id: int) -> List[str]:
-        """Get tags for a project."""
+    def _get_project_tags(self, session, project_id: int) -> List[dict]:
+        """Get tags for a project with color and description."""
         tags = (
             session.query(TagModel)
             .filter(TagModel.linked_type == "project", TagModel.linked_id == project_id)
             .all()
         )
-        return [tag.name for tag in tags]
+        return [
+            {
+                "name": tag.name,
+                "color": tag.color or "#FF5733",
+                "description": tag.description or "",
+            }
+            for tag in tags
+        ]
 
     def _project_model_to_dataclass(
-        self, db_project: ProjectModel, tags: List[str]
+        self, db_project: ProjectModel, tags: List[dict]
     ) -> Project:
         """Convert ProjectModel to Project dataclass."""
         return Project(
@@ -721,16 +749,23 @@ class DatabaseService:
                 return True
             return False
 
-    def _get_task_tags(self, session, task_id: int) -> List[str]:
-        """Get tags for a task."""
+    def _get_task_tags(self, session, task_id: int) -> List[dict]:
+        """Get tags for a task with color and description."""
         tags = (
             session.query(TagModel)
             .filter(TagModel.linked_type == "task", TagModel.linked_id == task_id)
             .all()
         )
-        return [tag.name for tag in tags]
+        return [
+            {
+                "name": tag.name,
+                "color": tag.color or "#FF5733",
+                "description": tag.description or "",
+            }
+            for tag in tags
+        ]
 
-    def _task_model_to_dataclass(self, db_task: TaskModel, tags: List[str]) -> Task:
+    def _task_model_to_dataclass(self, db_task: TaskModel, tags: List[dict]) -> Task:
         """Convert TaskModel to Task dataclass."""
         return Task(
             id=db_task.id,
@@ -791,31 +826,45 @@ class DatabaseService:
             type=db_timer.type,
         )
 
-    def get_project_tags(self, project_id: int) -> List[str]:
+    def get_project_tags(self, project_id: int) -> List[dict]:
         """Get all tags for a specific project."""
         with self.get_session() as session:
             tags = (
-                session.query(TagModel.name)
+                session.query(TagModel.name, TagModel.color, TagModel.description)
                 .filter(
                     TagModel.linked_type == "project",
                     TagModel.linked_id == project_id,
                 )
                 .all()
             )
-            return [tag[0] for tag in tags]
+            return [
+                {
+                    "name": tag[0],
+                    "color": tag[1] or "#FF5733",
+                    "description": tag[2] or "",
+                }
+                for tag in tags
+            ]
 
-    def get_task_tags(self, task_id: int) -> List[str]:
+    def get_task_tags(self, task_id: int) -> List[dict]:
         """Get all tags for a specific task."""
         with self.get_session() as session:
             tags = (
-                session.query(TagModel.name)
+                session.query(TagModel.name, TagModel.color, TagModel.description)
                 .filter(
                     TagModel.linked_type == "task",
                     TagModel.linked_id == task_id,
                 )
                 .all()
             )
-            return [tag[0] for tag in tags]
+            return [
+                {
+                    "name": tag[0],
+                    "color": tag[1] or "#FF5733",
+                    "description": tag[2] or "",
+                }
+                for tag in tags
+            ]
 
     def sync_project_tags_to_tasks(self, project_id: int) -> bool:
         """Synchronize project tags to all its tasks (add missing tags to tasks)."""

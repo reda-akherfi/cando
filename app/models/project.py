@@ -26,7 +26,7 @@ class Project:
     estimated_hours: Optional[float] = None
     priority: str = "medium"  # low, medium, high, urgent
     status: str = "active"  # active, completed, paused, cancelled
-    tags: List[str] = field(default_factory=list)
+    tags: List[dict] = field(default_factory=list)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

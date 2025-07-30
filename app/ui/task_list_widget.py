@@ -145,12 +145,27 @@ class TaskItemWidget(QWidget):
 
         # Tags
         if self.task.tags:
-            tags_label = QLabel(f"Tags: {', '.join(self.task.tags[:2])}")
+            tags_layout = QHBoxLayout()
+            tags_layout.setSpacing(4)
+
+            # Display first 2 tags with colors
+            for i, tag in enumerate(self.task.tags[:2]):
+                tag_label = QLabel(tag["name"])
+                tag_label.setFont(QFont("Arial", 8))
+                tag_label.setStyleSheet(
+                    f"color: white; background-color: {tag['color']}; "
+                    f"padding: 2px 6px; border-radius: 8px;"
+                )
+                tags_layout.addWidget(tag_label)
+
             if len(self.task.tags) > 2:
-                tags_label.setText(tags_label.text() + "...")
-            tags_label.setFont(QFont("Arial", 8))
-            tags_label.setStyleSheet("color: #007bff;")
-            secondary_layout.addWidget(tags_label)
+                more_label = QLabel("...")
+                more_label.setFont(QFont("Arial", 8))
+                more_label.setStyleSheet("color: #6c757d;")
+                tags_layout.addWidget(more_label)
+
+            tags_layout.addStretch()
+            secondary_layout.addLayout(tags_layout)
 
         layout.addLayout(secondary_layout)
 
