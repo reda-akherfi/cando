@@ -205,8 +205,10 @@ class DatabaseService:
                 return True
             return False
 
-    def add_project_tag(self, project_id: int, tag_name: str) -> bool:
-        """Add a tag to a project."""
+    def add_project_tag(
+        self, project_id: int, tag_name: str, cascade_to_tasks: bool = True
+    ) -> bool:
+        """Add a tag to a project and optionally cascade to all its tasks."""
         with self.get_session() as session:
             # Check if project exists
             project = (
@@ -231,16 +233,44 @@ class DatabaseService:
             if existing_tag:
                 return False  # Tag already exists for this project
 
-            # Create new tag
+            # Create new tag for project
             new_tag = TagModel(
                 name=tag_name, linked_type="project", linked_id=project_id
             )
             session.add(new_tag)
+
+            # Cascade to tasks if requested
+            if cascade_to_tasks:
+                tasks = (
+                    session.query(TaskModel)
+                    .filter(TaskModel.project_id == project_id)
+                    .all()
+                )
+                for task in tasks:
+                    # Check if tag already exists for this task
+                    existing_task_tag = (
+                        session.query(TagModel)
+                        .filter(
+                            TagModel.name == tag_name,
+                            TagModel.linked_type == "task",
+                            TagModel.linked_id == task.id,
+                        )
+                        .first()
+                    )
+
+                    if not existing_task_tag:
+                        task_tag = TagModel(
+                            name=tag_name, linked_type="task", linked_id=task.id
+                        )
+                        session.add(task_tag)
+
             session.commit()
             return True
 
-    def add_task_tag(self, task_id: int, tag_name: str) -> bool:
-        """Add a tag to a task."""
+    def add_task_tag(
+        self, task_id: int, tag_name: str, cascade_to_project: bool = True
+    ) -> bool:
+        """Add a tag to a task and optionally cascade to the project if ALL tasks in the project have this tag."""
         with self.get_session() as session:
             # Check if task exists
             task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
@@ -261,14 +291,61 @@ class DatabaseService:
             if existing_tag:
                 return False  # Tag already exists for this task
 
-            # Create new tag
+            # Create new tag for task
             new_tag = TagModel(name=tag_name, linked_type="task", linked_id=task_id)
             session.add(new_tag)
+
+            # Cascade to project if requested
+            if cascade_to_project:
+                # Get all tasks in the project
+                all_tasks_in_project = (
+                    session.query(TaskModel)
+                    .filter(TaskModel.project_id == task.project_id)
+                    .all()
+                )
+
+                # Get all tasks in the project that have this tag (including the one we just added)
+                # We need to flush the session to make sure our new tag is included in the query
+                session.flush()
+                tasks_with_tag = (
+                    session.query(TagModel)
+                    .filter(
+                        TagModel.name == tag_name,
+                        TagModel.linked_type == "task",
+                    )
+                    .join(TaskModel, TagModel.linked_id == TaskModel.id)
+                    .filter(TaskModel.project_id == task.project_id)
+                    .all()
+                )
+
+                # If ALL tasks in the project now have this tag, add it to the project
+                if len(tasks_with_tag) == len(all_tasks_in_project):
+                    # Check if project already has this tag
+                    project_tag = (
+                        session.query(TagModel)
+                        .filter(
+                            TagModel.name == tag_name,
+                            TagModel.linked_type == "project",
+                            TagModel.linked_id == task.project_id,
+                        )
+                        .first()
+                    )
+
+                    if not project_tag:
+                        project_tag = TagModel(
+                            name=tag_name,
+                            linked_type="project",
+                            linked_id=task.project_id,
+                        )
+                        session.add(project_tag)
+
             session.commit()
             return True
 
-    def remove_project_tag(self, project_id: int, tag_name: str) -> bool:
-        """Remove a tag from a project."""
+    def remove_project_tag(
+        self, project_id: int, tag_name: str, cascade_to_tasks: bool = True
+    ) -> bool:
+        """Remove a tag from a project and optionally cascade removal to all its tasks."""
         with self.get_session() as session:
             tag = (
                 session.query(TagModel)
@@ -282,12 +359,30 @@ class DatabaseService:
 
             if tag:
                 session.delete(tag)
+
+                # Cascade removal to tasks if requested
+                if cascade_to_tasks:
+                    task_tags = (
+                        session.query(TagModel)
+                        .filter(
+                            TagModel.name == tag_name, TagModel.linked_type == "task"
+                        )
+                        .join(TaskModel, TagModel.linked_id == TaskModel.id)
+                        .filter(TaskModel.project_id == project_id)
+                        .all()
+                    )
+
+                    for task_tag in task_tags:
+                        session.delete(task_tag)
+
                 session.commit()
                 return True
             return False
 
-    def remove_task_tag(self, task_id: int, tag_name: str) -> bool:
-        """Remove a tag from a task."""
+    def remove_task_tag(
+        self, task_id: int, tag_name: str, cascade_to_project: bool = True
+    ) -> bool:
+        """Remove a tag from a task and optionally cascade removal to the project if not ALL tasks have this tag."""
         with self.get_session() as session:
             tag = (
                 session.query(TagModel)
@@ -301,6 +396,52 @@ class DatabaseService:
 
             if tag:
                 session.delete(tag)
+
+                # Cascade removal to project if requested
+                if cascade_to_project:
+                    # Get the task to find its project
+                    task = (
+                        session.query(TaskModel).filter(TaskModel.id == task_id).first()
+                    )
+                    if task:
+                        # Get all tasks in the project
+                        all_tasks_in_project = (
+                            session.query(TaskModel)
+                            .filter(TaskModel.project_id == task.project_id)
+                            .all()
+                        )
+
+                        # Flush the session to make sure the deletion is reflected in the query
+                        session.flush()
+
+                        # Get all tasks in the project that have this tag
+                        tasks_with_tag = (
+                            session.query(TagModel)
+                            .filter(
+                                TagModel.name == tag_name,
+                                TagModel.linked_type == "task",
+                            )
+                            .join(TaskModel, TagModel.linked_id == TaskModel.id)
+                            .filter(TaskModel.project_id == task.project_id)
+                            .all()
+                        )
+
+                        # If not ALL tasks in the project have this tag, remove it from the project
+                        # (This implements: "if a project has at least one task without a tag,
+                        # the tag should not be considered as applied to the whole project")
+                        if len(tasks_with_tag) < len(all_tasks_in_project):
+                            project_tag = (
+                                session.query(TagModel)
+                                .filter(
+                                    TagModel.name == tag_name,
+                                    TagModel.linked_type == "project",
+                                    TagModel.linked_id == task.project_id,
+                                )
+                                .first()
+                            )
+                            if project_tag:
+                                session.delete(project_tag)
+
                 session.commit()
                 return True
             return False
@@ -473,7 +614,28 @@ class DatabaseService:
 
             # Add tags separately
             for tag_name in tags:
-                self.add_task_tag(db_task.id, tag_name)
+                self.add_task_tag(db_task.id, tag_name, cascade_to_project=True)
+
+            # Inherit project tags if any
+            project_tags = self._get_project_tags(session, db_task.project_id)
+            for tag_name in project_tags:
+                # Check if tag already exists for this task
+                existing_tag = (
+                    session.query(TagModel)
+                    .filter(
+                        TagModel.name == tag_name,
+                        TagModel.linked_type == "task",
+                        TagModel.linked_id == db_task.id,
+                    )
+                    .first()
+                )
+                if not existing_tag:
+                    task_tag = TagModel(
+                        name=tag_name, linked_type="task", linked_id=db_task.id
+                    )
+                    session.add(task_tag)
+
+            session.commit()
 
             # Get tags for this task
             task_tags = self._get_task_tags(session, db_task.id)
@@ -617,3 +779,114 @@ class DatabaseService:
             end=db_timer.end,
             type=db_timer.type,
         )
+
+    def get_project_tags(self, project_id: int) -> List[str]:
+        """Get all tags for a specific project."""
+        with self.get_session() as session:
+            tags = (
+                session.query(TagModel.name)
+                .filter(
+                    TagModel.linked_type == "project",
+                    TagModel.linked_id == project_id,
+                )
+                .all()
+            )
+            return [tag[0] for tag in tags]
+
+    def get_task_tags(self, task_id: int) -> List[str]:
+        """Get all tags for a specific task."""
+        with self.get_session() as session:
+            tags = (
+                session.query(TagModel.name)
+                .filter(
+                    TagModel.linked_type == "task",
+                    TagModel.linked_id == task_id,
+                )
+                .all()
+            )
+            return [tag[0] for tag in tags]
+
+    def sync_project_tags_to_tasks(self, project_id: int) -> bool:
+        """Synchronize project tags to all its tasks (add missing tags to tasks)."""
+        with self.get_session() as session:
+            # Get project tags
+            project_tags = (
+                session.query(TagModel.name)
+                .filter(
+                    TagModel.linked_type == "project",
+                    TagModel.linked_id == project_id,
+                )
+                .all()
+            )
+            project_tag_names = [tag[0] for tag in project_tags]
+
+            # Get all tasks for this project
+            tasks = (
+                session.query(TaskModel)
+                .filter(TaskModel.project_id == project_id)
+                .all()
+            )
+
+            for task in tasks:
+                # Get current task tags
+                task_tags = (
+                    session.query(TagModel.name)
+                    .filter(
+                        TagModel.linked_type == "task",
+                        TagModel.linked_id == task.id,
+                    )
+                    .all()
+                )
+                task_tag_names = [tag[0] for tag in task_tags]
+
+                # Add missing project tags to task
+                for tag_name in project_tag_names:
+                    if tag_name not in task_tag_names:
+                        task_tag = TagModel(
+                            name=tag_name, linked_type="task", linked_id=task.id
+                        )
+                        session.add(task_tag)
+
+            session.commit()
+            return True
+
+    def sync_task_tags_to_project(self, task_id: int) -> bool:
+        """Synchronize task tags to project (add task tags to project if not present)."""
+        with self.get_session() as session:
+            # Get task
+            task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
+            if not task:
+                return False
+
+            # Get task tags
+            task_tags = (
+                session.query(TagModel.name)
+                .filter(
+                    TagModel.linked_type == "task",
+                    TagModel.linked_id == task_id,
+                )
+                .all()
+            )
+            task_tag_names = [tag[0] for tag in task_tags]
+
+            # Get current project tags
+            project_tags = (
+                session.query(TagModel.name)
+                .filter(
+                    TagModel.linked_type == "project",
+                    TagModel.linked_id == task.project_id,
+                )
+                .all()
+            )
+            project_tag_names = [tag[0] for tag in project_tags]
+
+            # Add missing task tags to project
+            for tag_name in task_tag_names:
+                if tag_name not in project_tag_names:
+                    project_tag = TagModel(
+                        name=tag_name, linked_type="project", linked_id=task.project_id
+                    )
+                    session.add(project_tag)
+
+            session.commit()
+            return True

@@ -207,3 +207,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+test_cascading.db
+test_corrected_cascading.db
+simple_test.db
+direct_test.db
+debug_cascading.db
+*.db

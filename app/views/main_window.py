@@ -656,14 +656,34 @@ class MainWindow(QMainWindow):
             # Create project
             project = self.db_service.create_project(**project_data)
 
-            # Add tags separately
+            # Add tags separately (with cascading to tasks)
             for tag in tags:
-                self.db_service.add_project_tag(project.id, tag)
+                self.db_service.add_project_tag(project.id, tag, cascade_to_tasks=True)
 
             self.refresh_project_list()
-            QMessageBox.information(
-                self, "Success", f"Project '{project.name}' created successfully!"
-            )
+            self.populate_project_tag_filter()  # Update project tag filter
+
+            # Show cascading info if tags were added
+            if tags:
+                task_count = len(self.db_service.get_tasks(project.id))
+                if task_count > 0:
+                    QMessageBox.information(
+                        self,
+                        "Success",
+                        f"Project '{project.name}' created successfully!\n\n"
+                        f"Tags have been automatically applied to all {task_count} tasks in this project.",
+                    )
+                else:
+                    QMessageBox.information(
+                        self,
+                        "Success",
+                        f"Project '{project.name}' created successfully!\n\n"
+                        "Tags will be automatically applied to any tasks you add to this project.",
+                    )
+            else:
+                QMessageBox.information(
+                    self, "Success", f"Project '{project.name}' created successfully!"
+                )
 
     def edit_project(self, project: Project):
         """Edit an existing project."""
@@ -673,6 +693,7 @@ class MainWindow(QMainWindow):
                 # Project was deleted
                 self.db_service.delete_project(project.id)
                 self.refresh_project_list()
+                self.populate_project_tag_filter()  # Update project tag filter
                 QMessageBox.information(
                     self, "Success", f"Project '{project.name}' deleted successfully!"
                 )
@@ -688,14 +709,24 @@ class MainWindow(QMainWindow):
                     project.id, **project_data
                 )
 
-                # Update tags (remove old ones, add new ones)
-                # This is a simplified approach - in a real app you'd want to be more efficient
+                # Update tags (remove old ones, add new ones with cascading)
                 for tag in project.tags:
-                    self.db_service.remove_project_tag(project.id, tag)
+                    self.db_service.remove_project_tag(
+                        project.id, tag, cascade_to_tasks=True
+                    )
                 for tag in new_tags:
-                    self.db_service.add_project_tag(project.id, tag)
+                    self.db_service.add_project_tag(
+                        project.id, tag, cascade_to_tasks=True
+                    )
 
+                # Refresh both project list and task list to show updated tags
                 self.refresh_project_list()
+                if self.current_project_id == project.id:
+                    self.refresh_task_list(
+                        project.id
+                    )  # Refresh task list if this project is currently selected
+                    self.populate_task_tag_filter(project.id)  # Update task tag filter
+                self.populate_project_tag_filter()  # Update project tag filter
                 QMessageBox.information(
                     self,
                     "Success",
@@ -715,6 +746,7 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             self.db_service.delete_project(project.id)
             self.refresh_project_list()
+            self.populate_project_tag_filter()  # Update project tag filter
             QMessageBox.information(
                 self, "Success", f"Project '{project.name}' deleted successfully!"
             )
@@ -842,14 +874,30 @@ class MainWindow(QMainWindow):
             # Create task
             task = self.db_service.create_task(**task_data)
 
-            # Add tags separately
+            # Add tags separately (with cascading to project)
             for tag in tags:
-                self.db_service.add_task_tag(task.id, tag)
+                self.db_service.add_task_tag(task.id, tag, cascade_to_project=True)
 
+            # Refresh both task list and project list to show updated tags
             self.refresh_task_list(self.current_project_id)
-            QMessageBox.information(
-                self, "Success", f"Task '{task.name}' created successfully!"
-            )
+            self.refresh_project_list()  # Refresh project list to show updated project tags
+            self.populate_task_tag_filter(
+                self.current_project_id
+            )  # Update task tag filter
+            self.populate_project_tag_filter()  # Update project tag filter
+
+            # Show cascading info if tags were added
+            if tags:
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Task '{task.name}' created successfully!\n\n"
+                    "Tags have been automatically added to the project as well.",
+                )
+            else:
+                QMessageBox.information(
+                    self, "Success", f"Task '{task.name}' created successfully!"
+                )
 
     def edit_task(self, task: Task):
         """Edit an existing task."""
@@ -872,13 +920,22 @@ class MainWindow(QMainWindow):
                 # Update task
                 updated_task = self.db_service.update_task(task.id, **task_data)
 
-                # Update tags (remove old ones, add new ones)
+                # Update tags (remove old ones, add new ones with cascading)
                 for tag in task.tags:
-                    self.db_service.remove_task_tag(task.id, tag)
+                    self.db_service.remove_task_tag(
+                        task.id, tag, cascade_to_project=True
+                    )
                 for tag in new_tags:
-                    self.db_service.add_task_tag(task.id, tag)
+                    self.db_service.add_task_tag(task.id, tag, cascade_to_project=True)
 
+                # Refresh both task list and project list to show updated tags
                 self.refresh_task_list(self.current_project_id)
+                self.refresh_project_list()  # Refresh project list to show updated project tags
+                self.populate_task_tag_filter(
+                    self.current_project_id
+                )  # Update task tag filter
+                self.populate_project_tag_filter()  # Update project tag filter
+
                 QMessageBox.information(
                     self,
                     "Success",
@@ -897,7 +954,13 @@ class MainWindow(QMainWindow):
 
         if reply == QMessageBox.Yes:
             self.db_service.delete_task(task.id)
+            # Refresh both task list and project list (deleting task might affect project tags)
             self.refresh_task_list(self.current_project_id)
+            self.refresh_project_list()
+            self.populate_task_tag_filter(
+                self.current_project_id
+            )  # Update task tag filter
+            self.populate_project_tag_filter()  # Update project tag filter
             QMessageBox.information(
                 self, "Success", f"Task '{task.name}' deleted successfully!"
             )
