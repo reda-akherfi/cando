@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QScrollArea,
     QWidget,
+    QDialog,
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont, QColor
@@ -201,16 +202,10 @@ class ProjectDialog(BaseDialog):
         title.setFont(QFont("Arial", 12, QFont.Bold))
         layout.addWidget(title)
 
-        # Tag input
-        tag_layout = QHBoxLayout()
-        self.tag_edit = QLineEdit()
-        self.tag_edit.setPlaceholderText("Enter tag name")
+        # Add tag button
         self.add_tag_button = QPushButton("Add Tag")
         self.add_tag_button.clicked.connect(self.add_tag)
-
-        tag_layout.addWidget(self.tag_edit)
-        tag_layout.addWidget(self.add_tag_button)
-        layout.addLayout(tag_layout)
+        layout.addWidget(self.add_tag_button)
 
         # Tags list
         self.tags_list = QListWidget()
@@ -245,24 +240,42 @@ class ProjectDialog(BaseDialog):
 
         # Tags
         for tag in self.project.tags:
-            self.add_tag_to_list(tag)
+            # Handle both old string format and new dict format
+            if isinstance(tag, dict):
+                self.add_tag_to_list(tag["name"])
+            else:
+                self.add_tag_to_list(tag)
 
     def add_tag(self):
         """Add a new tag to the project."""
-        tag_name = self.tag_edit.text().strip()
-        if not tag_name:
-            return
+        # Get existing tags from the database
+        # Find the main window to access the database service
+        main_window = self.parent()
+        while main_window and not hasattr(main_window, "db_service"):
+            main_window = main_window.parent()
 
-        # Check if tag already exists
-        for i in range(self.tags_list.count()):
-            if self.tags_list.item(i).text() == tag_name:
-                QMessageBox.warning(
-                    self, "Duplicate Tag", f"Tag '{tag_name}' already exists."
-                )
-                return
+        if main_window and hasattr(main_window, "db_service"):
+            existing_tags = main_window.db_service.get_all_tags()
 
-        self.add_tag_to_list(tag_name)
-        self.tag_edit.clear()
+            # Show tag selection dialog
+            from app.ui.tag_selection_dialog import TagSelectionDialog
+
+            dialog = TagSelectionDialog(existing_tags, self)
+
+            if dialog.exec() == QDialog.Accepted:
+                selected_tag = dialog.get_selected_tag()
+                if selected_tag:
+                    # Check if tag already exists in the current list
+                    for i in range(self.tags_list.count()):
+                        if self.tags_list.item(i).text() == selected_tag:
+                            QMessageBox.warning(
+                                self,
+                                "Duplicate Tag",
+                                f"Tag '{selected_tag}' already exists.",
+                            )
+                            return
+
+                    self.add_tag_to_list(selected_tag)
 
     def add_tag_to_list(self, tag_name: str):
         """Add a tag to the tags list."""

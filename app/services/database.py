@@ -246,9 +246,23 @@ class DatabaseService:
             if existing_tag:
                 return False  # Tag already exists for this project
 
+            # Check if tag exists elsewhere to get color and description
+            existing_tag_info = (
+                session.query(TagModel).filter(TagModel.name == tag_name).first()
+            )
+
+            # If there's a dummy tag, remove it since we're creating a real one
+            if existing_tag_info and existing_tag_info.linked_type == "dummy":
+                session.delete(existing_tag_info)
+                session.flush()
+
             # Create new tag for project
             new_tag = TagModel(
-                name=tag_name, linked_type="project", linked_id=project_id
+                name=tag_name,
+                linked_type="project",
+                linked_id=project_id,
+                color=existing_tag_info.color if existing_tag_info else "#FF5733",
+                description=existing_tag_info.description if existing_tag_info else "",
             )
             session.add(new_tag)
 
@@ -273,7 +287,19 @@ class DatabaseService:
 
                     if not existing_task_tag:
                         task_tag = TagModel(
-                            name=tag_name, linked_type="task", linked_id=task.id
+                            name=tag_name,
+                            linked_type="task",
+                            linked_id=task.id,
+                            color=(
+                                existing_tag_info.color
+                                if existing_tag_info
+                                else "#FF5733"
+                            ),
+                            description=(
+                                existing_tag_info.description
+                                if existing_tag_info
+                                else ""
+                            ),
                         )
                         session.add(task_tag)
 
@@ -304,8 +330,24 @@ class DatabaseService:
             if existing_tag:
                 return False  # Tag already exists for this task
 
+            # Check if tag exists elsewhere to get color and description
+            existing_tag_info = (
+                session.query(TagModel).filter(TagModel.name == tag_name).first()
+            )
+
+            # If there's a dummy tag, remove it since we're creating a real one
+            if existing_tag_info and existing_tag_info.linked_type == "dummy":
+                session.delete(existing_tag_info)
+                session.flush()
+
             # Create new tag for task
-            new_tag = TagModel(name=tag_name, linked_type="task", linked_id=task_id)
+            new_tag = TagModel(
+                name=tag_name,
+                linked_type="task",
+                linked_id=task_id,
+                color=existing_tag_info.color if existing_tag_info else "#FF5733",
+                description=existing_tag_info.description if existing_tag_info else "",
+            )
             session.add(new_tag)
 
             # Cascade to project if requested
@@ -349,6 +391,16 @@ class DatabaseService:
                             name=tag_name,
                             linked_type="project",
                             linked_id=task.project_id,
+                            color=(
+                                existing_tag_info.color
+                                if existing_tag_info
+                                else "#FF5733"
+                            ),
+                            description=(
+                                existing_tag_info.description
+                                if existing_tag_info
+                                else ""
+                            ),
                         )
                         session.add(project_tag)
 
@@ -527,13 +579,18 @@ class DatabaseService:
     ) -> bool:
         """Add a new tag (if it doesn't exist)."""
         with self.get_session() as session:
-            # Check if tag already exists
+            # Check if tag already exists (including dummy tags)
             existing_tag = (
                 session.query(TagModel).filter(TagModel.name == tag_name).first()
             )
 
             if existing_tag:
-                return False  # Tag already exists
+                # If it's a dummy tag, update it with the new color/description
+                if existing_tag.linked_type == "dummy":
+                    existing_tag.color = color
+                    existing_tag.description = description
+                    session.commit()
+                return True  # Tag already exists
 
             # Create a dummy tag entry to establish the tag
             # This will be replaced when the tag is actually used

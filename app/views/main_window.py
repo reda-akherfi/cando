@@ -740,8 +740,10 @@ class MainWindow(QMainWindow):
 
                 # Update tags (remove old ones, add new ones with cascading)
                 for tag in project.tags:
+                    # Handle both old string format and new dict format
+                    tag_name = tag["name"] if isinstance(tag, dict) else tag
                     self.db_service.remove_project_tag(
-                        project.id, tag, cascade_to_tasks=True
+                        project.id, tag_name, cascade_to_tasks=True
                     )
                 for tag in new_tags:
                     self.db_service.add_project_tag(
@@ -951,8 +953,10 @@ class MainWindow(QMainWindow):
 
                 # Update tags (remove old ones, add new ones with cascading)
                 for tag in task.tags:
+                    # Handle both old string format and new dict format
+                    tag_name = tag["name"] if isinstance(tag, dict) else tag
                     self.db_service.remove_task_tag(
-                        task.id, tag, cascade_to_project=True
+                        task.id, tag_name, cascade_to_project=True
                     )
                 for tag in new_tags:
                     self.db_service.add_task_tag(task.id, tag, cascade_to_project=True)
@@ -1093,7 +1097,13 @@ class MainWindow(QMainWindow):
                     tag_data["color"],
                     tag_data["description"],
                 ):
+                    # Refresh all UI components that display tags
                     self.refresh_tags()
+                    self.refresh_project_list()
+                    if hasattr(self, "current_project_id") and self.current_project_id:
+                        self.refresh_task_list(self.current_project_id)
+                        self.populate_task_tag_filter(self.current_project_id)
+                    self.populate_project_tag_filter()
                     QMessageBox.information(
                         self,
                         "Success",
@@ -1109,7 +1119,13 @@ class MainWindow(QMainWindow):
     def delete_tag(self, tag: Tag):
         """Delete a tag."""
         if self.db_service.delete_tag(tag.name):
+            # Refresh all UI components that display tags
             self.refresh_tags()
+            self.refresh_project_list()
+            if hasattr(self, "current_project_id") and self.current_project_id:
+                self.refresh_task_list(self.current_project_id)
+                self.populate_task_tag_filter(self.current_project_id)
+            self.populate_project_tag_filter()
             QMessageBox.information(
                 self, "Success", f"Tag '{tag.name}' deleted successfully!"
             )
@@ -1127,7 +1143,13 @@ class MainWindow(QMainWindow):
                 if self.db_service.add_tag(
                     tag_data["name"], tag_data["color"], tag_data["description"]
                 ):
+                    # Refresh all UI components that display tags
                     self.refresh_tags()
+                    self.refresh_project_list()
+                    if hasattr(self, "current_project_id") and self.current_project_id:
+                        self.refresh_task_list(self.current_project_id)
+                        self.populate_task_tag_filter(self.current_project_id)
+                    self.populate_project_tag_filter()
                     QMessageBox.information(
                         self, "Success", f"Tag '{tag_data['name']}' added successfully!"
                     )
