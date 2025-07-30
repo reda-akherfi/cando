@@ -606,6 +606,11 @@ class MainWindow(QMainWindow):
         timer_stats = self.analytics_service.get_timer_type_stats()
         self.timer_type_chart.plot_timer_types(timer_stats)
 
+        # Ensure all charts use the current theme colors
+        self.project_chart.update_theme_colors()
+        self.productivity_chart.update_theme_colors()
+        self.timer_type_chart.update_theme_colors()
+
     def show_previous_chart(self):
         """Show the previous chart in the sequence."""
         if self.current_chart_index > 0:

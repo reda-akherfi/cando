@@ -9,8 +9,9 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PySide6.QtWidgets import QWidget, QVBoxLayout
-from app.ui.theme import DarkTheme
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QApplication
+from PySide6.QtGui import QPalette
+from app.ui.theme import DarkTheme, LightTheme
 
 
 class ChartWidget(QWidget):
@@ -23,27 +24,52 @@ class ChartWidget(QWidget):
     def __init__(self, parent=None):
         """Initialize the chart widget with matplotlib figure."""
         super().__init__(parent)
-        self.colors = DarkTheme.get_chart_colors()
+        self.colors = self._get_current_theme_colors()
 
-        # Create figure with dark theme
+        # Create figure with current theme
         self.figure = Figure(figsize=(8, 6), facecolor=self.colors["background"])
         self.canvas = FigureCanvas(self.figure)
         self.axes = self.figure.add_subplot(111, facecolor=self.colors["background"])
 
-        # Apply dark theme to the axes
+        # Apply current theme to the axes
         self.axes.set_facecolor(self.colors["background"])
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.canvas)
         self.setLayout(layout)
 
+    def _get_current_theme_colors(self):
+        """Get chart colors based on the current application theme."""
+        app = QApplication.instance()
+        if app:
+            # Check if the application is using dark theme by looking at the palette
+            palette = app.palette()
+            window_color = palette.color(QPalette.ColorRole.Window)
+            # If window color is dark, use dark theme colors
+            if window_color.lightness() < 128:
+                return DarkTheme.get_chart_colors()
+            else:
+                return LightTheme.get_chart_colors()
+        # Default to dark theme if we can't determine
+        return DarkTheme.get_chart_colors()
+
     def clear(self):
         """Clear the current chart."""
         self.axes.clear()
+        # Update colors to current theme
+        self.colors = self._get_current_theme_colors()
         self.axes.set_facecolor(self.colors["background"])
+        self.figure.set_facecolor(self.colors["background"])
 
     def update_chart(self):
         """Update the chart display."""
+        self.canvas.draw()
+
+    def update_theme_colors(self):
+        """Update the chart colors to match the current theme."""
+        self.colors = self._get_current_theme_colors()
+        self.figure.set_facecolor(self.colors["background"])
+        self.axes.set_facecolor(self.colors["background"])
         self.canvas.draw()
 
 
