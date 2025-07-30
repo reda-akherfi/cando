@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QColor, QPalette
+from PySide6.QtGui import QFont, QColor, QPalette, QMouseEvent
 from app.models.project import Project
 from app.utils.fuzzy_search import highlight_search_terms
 
@@ -40,11 +40,42 @@ class ProjectItemWidget(QWidget):
         self.search_query = search_query
         self.setup_ui()
 
+    def mousePressEvent(self, event: QMouseEvent):
+        """Handle mouse press events."""
+        if event.button() == Qt.LeftButton:
+            # Check if Ctrl is pressed for info dialog
+            if event.modifiers() & Qt.ControlModifier:
+                from app.ui.project_info_dialog import ProjectInfoDialog
+
+                dialog = ProjectInfoDialog(self.project, self)
+                dialog.exec()  # Use exec() instead of show() for modal behavior
+                event.accept()
+                return
+
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        """Handle double click events to open edit dialog."""
+        if event.button() == Qt.LeftButton:
+            # Find the parent ProjectListWidget and emit edit signal
+            parent = self.parent()
+            while parent and not hasattr(parent, "project_edit_requested"):
+                parent = parent.parent()
+
+            if parent and hasattr(parent, "project_edit_requested"):
+                parent.project_edit_requested.emit(self.project)
+            return
+
+        super().mouseDoubleClickEvent(event)
+
     def setup_ui(self):
         """Set up the user interface."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(4)
+
+        # Set tooltip for info dialog access
+        self.setToolTip("Ctrl+Click to view project details")
 
         # Main project info
         main_layout = QHBoxLayout()
@@ -151,6 +182,12 @@ class ProjectItemWidget(QWidget):
             tags_layout = QHBoxLayout()
             tags_layout.setSpacing(4)
 
+            # Create a container widget for tags to enable hover tooltip
+            tags_container = QWidget()
+            tags_container_layout = QHBoxLayout(tags_container)
+            tags_container_layout.setSpacing(4)
+            tags_container_layout.setContentsMargins(0, 0, 0, 0)
+
             # Display first 3 tags with colors
             for i, tag in enumerate(self.project.tags[:3]):
                 tag_label = QLabel(tag["name"])
@@ -159,16 +196,18 @@ class ProjectItemWidget(QWidget):
                     f"color: white; background-color: {tag['color']}; "
                     f"padding: 2px 6px; border-radius: 8px;"
                 )
-                tags_layout.addWidget(tag_label)
+                tags_container_layout.addWidget(tag_label)
 
             if len(self.project.tags) > 3:
                 more_label = QLabel("...")
                 more_label.setFont(QFont("Arial", 8))
                 more_label.setStyleSheet("color: #6c757d;")
-                tags_layout.addWidget(more_label)
+                tags_container_layout.addWidget(more_label)
 
-            tags_layout.addStretch()
-            secondary_layout.addLayout(tags_layout)
+            # Add stretch to make tags take all available space
+            tags_container_layout.addStretch()
+
+            secondary_layout.addWidget(tags_container)
 
         layout.addLayout(secondary_layout)
 

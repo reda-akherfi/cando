@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QComboBox,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QColor, QPalette
+from PySide6.QtGui import QFont, QColor, QPalette, QMouseEvent
 from app.models.tag import Tag
 from app.utils.fuzzy_search import highlight_search_terms
 
@@ -44,6 +44,9 @@ class TagItemWidget(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+
+        # Set tooltip for double-click functionality
+        self.setToolTip("Double-click to edit tag")
 
         # Tag color indicator
         color_frame = QFrame()
@@ -112,6 +115,31 @@ class TagItemWidget(QWidget):
                 "background-color: #28a745; border-radius: 4px;"
             )
             layout.addWidget(popularity_frame)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        """Handle mouse press events."""
+        if event.button() == Qt.LeftButton:
+            # Check if Ctrl is pressed for info dialog (future feature)
+            if event.modifiers() & Qt.ControlModifier:
+                # Could add tag info dialog here in the future
+                event.accept()
+                return
+
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        """Handle mouse double-click events."""
+        if event.button() == Qt.LeftButton:
+            # Emit edit signal for the tag
+            if hasattr(self.parent(), "parent") and self.parent().parent():
+                # Find the TagListWidget parent
+                list_widget = self.parent().parent()
+                if hasattr(list_widget, "tag_edit_requested"):
+                    list_widget.tag_edit_requested.emit(self.tag)
+            event.accept()
+            return
+
+        super().mouseDoubleClickEvent(event)
 
 
 class TagListWidget(QListWidget):
