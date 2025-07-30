@@ -41,6 +41,7 @@ class TagDialog(BaseDialog):
         self.tag_color = tag_color
         self.tag_description = tag_description
         self.setup_ui()
+        self.setup_tag_dialog_sizing()
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -105,6 +106,18 @@ class TagDialog(BaseDialog):
         button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.save_button)
         layout.addLayout(button_layout)
+
+    def setup_tag_dialog_sizing(self):
+        """Set up custom sizing for the tag dialog."""
+        # Override the base dialog sizing with more appropriate dimensions for a tag dialog
+        self.setFixedSize(400, 280)  # Compact size suitable for tag editing
+
+        # Center the dialog on screen
+        if self.parent():
+            parent_rect = self.parent().geometry()
+            x = parent_rect.x() + (parent_rect.width() - self.width()) // 2
+            y = parent_rect.y() + (parent_rect.height() - self.height()) // 2
+            self.move(x, y)
 
     def choose_color(self):
         """Open color picker dialog."""
