@@ -176,6 +176,12 @@ class MainWindow(QMainWindow):
         """Set up the projects tab for project and task management."""
         layout = QVBoxLayout(self.projects_tab)
 
+        # Main horizontal layout for projects (left) and tasks (right)
+        main_layout = QHBoxLayout()
+
+        # Left side - Projects
+        projects_layout = QVBoxLayout()
+
         # Project management controls
         controls_layout = QHBoxLayout()
 
@@ -250,12 +256,12 @@ class MainWindow(QMainWindow):
 
         controls_layout.addWidget(self.add_project_btn)
 
-        layout.addLayout(controls_layout)
+        projects_layout.addLayout(controls_layout)
 
         # Search results counter
         self.search_results_label = QLabel("")
         self.search_results_label.setStyleSheet("color: #888; font-size: 11px;")
-        layout.addWidget(self.search_results_label)
+        projects_layout.addWidget(self.search_results_label)
 
         # Project list
         self.project_list_widget = ProjectListWidget()
@@ -263,12 +269,10 @@ class MainWindow(QMainWindow):
         self.project_list_widget.project_delete_requested.connect(self.delete_project)
         self.project_list_widget.project_selected.connect(self.on_project_selected)
 
-        layout.addWidget(self.project_list_widget)
+        projects_layout.addWidget(self.project_list_widget)
 
-        # Task management section
-        task_section_label = QLabel("Tasks:")
-        task_section_label.setFont(QFont("Arial", 12, QFont.Bold))
-        layout.addWidget(task_section_label)
+        # Right side - Tasks
+        tasks_layout = QVBoxLayout()
 
         # Task search and filter functionality
         task_controls_layout = QHBoxLayout()
@@ -352,12 +356,12 @@ class MainWindow(QMainWindow):
 
         task_controls_layout.addWidget(self.add_task_btn)
 
-        layout.addLayout(task_controls_layout)
+        tasks_layout.addLayout(task_controls_layout)
 
         # Task search results counter
         self.task_search_results_label = QLabel("")
         self.task_search_results_label.setStyleSheet("color: #888; font-size: 11px;")
-        layout.addWidget(self.task_search_results_label)
+        tasks_layout.addWidget(self.task_search_results_label)
 
         # Task list
         self.task_list_widget = TaskListWidget()
@@ -365,7 +369,14 @@ class MainWindow(QMainWindow):
         self.task_list_widget.task_delete_requested.connect(self.delete_task)
         self.task_list_widget.task_selected.connect(self.on_task_selected)
 
-        layout.addWidget(self.task_list_widget)
+        tasks_layout.addWidget(self.task_list_widget)
+
+        # Add both sides to the main horizontal layout
+        main_layout.addLayout(projects_layout)
+        main_layout.addLayout(tasks_layout)
+
+        # Add the main layout to the tab
+        layout.addLayout(main_layout)
 
     def setup_timer_tab(self):
         """Set up the timer tab with comprehensive timer widget."""
