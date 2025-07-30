@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
             "Search projects by name, description, or tags... (Ctrl+F)"
         )
         self.search_input.textChanged.connect(self.on_search_text_changed)
-        self.search_input.setMinimumWidth(300)
+        self.search_input.setMaximumWidth(165)  # 45% less than 300
 
         # Add keyboard shortcuts
         from PySide6.QtGui import QKeySequence, QShortcut
@@ -166,20 +166,42 @@ class MainWindow(QMainWindow):
         controls_layout.addLayout(search_layout)
 
         # Filter controls
-        filter_label = QLabel("Filter by Status:")
+        # Status filter
+        status_label = QLabel("Status:")
         self.status_filter = QComboBox()
         self.status_filter.addItems(
             ["All", "active", "paused", "completed", "cancelled"]
         )
         self.status_filter.currentTextChanged.connect(self.refresh_project_list)
+        self.status_filter.setMaximumWidth(100)
 
-        controls_layout.addWidget(filter_label)
+        # Priority filter
+        priority_label = QLabel("Priority:")
+        self.priority_filter = QComboBox()
+        self.priority_filter.addItems(["All", "low", "medium", "high"])
+        self.priority_filter.currentTextChanged.connect(self.refresh_project_list)
+        self.priority_filter.setMaximumWidth(100)
+
+        # Tag filter
+        tag_label = QLabel("Tag:")
+        self.tag_filter = QComboBox()
+        self.tag_filter.addItem("All")
+        self.tag_filter.currentTextChanged.connect(self.refresh_project_list)
+        self.tag_filter.setMaximumWidth(120)
+
+        controls_layout.addWidget(status_label)
         controls_layout.addWidget(self.status_filter)
+        controls_layout.addWidget(priority_label)
+        controls_layout.addWidget(self.priority_filter)
+        controls_layout.addWidget(tag_label)
+        controls_layout.addWidget(self.tag_filter)
         controls_layout.addStretch()
 
         # Action buttons
-        self.add_project_btn = QPushButton("Add Project")
+        self.add_project_btn = QPushButton("+")
         self.add_project_btn.clicked.connect(self.add_project)
+        self.add_project_btn.setMaximumWidth(40)
+        self.add_project_btn.setToolTip("Add Project")
 
         controls_layout.addWidget(self.add_project_btn)
 
@@ -203,15 +225,17 @@ class MainWindow(QMainWindow):
         task_section_label.setFont(QFont("Arial", 12, QFont.Bold))
         layout.addWidget(task_section_label)
 
-        # Task search functionality
-        task_search_layout = QHBoxLayout()
+        # Task search and filter functionality
+        task_controls_layout = QHBoxLayout()
+
+        # Task search
         task_search_label = QLabel("Search Tasks:")
         self.task_search_input = QLineEdit()
         self.task_search_input.setPlaceholderText(
             "Search tasks by name, description, or tags... (Ctrl+Shift+F)"
         )
         self.task_search_input.textChanged.connect(self.on_task_search_text_changed)
-        self.task_search_input.setMinimumWidth(300)
+        self.task_search_input.setMaximumWidth(165)  # 45% less than 300
         self.task_search_input.setEnabled(False)  # Disabled until project is selected
 
         # Add keyboard shortcuts for task search
@@ -230,27 +254,65 @@ class MainWindow(QMainWindow):
             False
         )  # Disabled until project is selected
 
-        task_search_layout.addWidget(task_search_label)
+        task_search_layout = QHBoxLayout()
         task_search_layout.addWidget(self.task_search_input)
         task_search_layout.addWidget(self.clear_task_search_btn)
-        task_search_layout.addStretch()
-        layout.addLayout(task_search_layout)
+
+        task_controls_layout.addWidget(task_search_label)
+        task_controls_layout.addLayout(task_search_layout)
+
+        # Task filters
+        # Task status filter
+        task_status_label = QLabel("Status:")
+        self.task_status_filter = QComboBox()
+        self.task_status_filter.addItems(["All", "pending", "completed"])
+        self.task_status_filter.currentTextChanged.connect(self.on_task_filter_changed)
+        self.task_status_filter.setMaximumWidth(100)
+        self.task_status_filter.setEnabled(False)  # Disabled until project is selected
+
+        # Task priority filter
+        task_priority_label = QLabel("Priority:")
+        self.task_priority_filter = QComboBox()
+        self.task_priority_filter.addItems(["All", "low", "medium", "high"])
+        self.task_priority_filter.currentTextChanged.connect(
+            self.on_task_filter_changed
+        )
+        self.task_priority_filter.setMaximumWidth(100)
+        self.task_priority_filter.setEnabled(
+            False
+        )  # Disabled until project is selected
+
+        # Task tag filter
+        task_tag_label = QLabel("Tag:")
+        self.task_tag_filter = QComboBox()
+        self.task_tag_filter.addItem("All")
+        self.task_tag_filter.currentTextChanged.connect(self.on_task_filter_changed)
+        self.task_tag_filter.setMaximumWidth(120)
+        self.task_tag_filter.setEnabled(False)  # Disabled until project is selected
+
+        task_controls_layout.addWidget(task_status_label)
+        task_controls_layout.addWidget(self.task_status_filter)
+        task_controls_layout.addWidget(task_priority_label)
+        task_controls_layout.addWidget(self.task_priority_filter)
+        task_controls_layout.addWidget(task_tag_label)
+        task_controls_layout.addWidget(self.task_tag_filter)
+        task_controls_layout.addStretch()
+
+        # Add task button
+        self.add_task_btn = QPushButton("+")
+        self.add_task_btn.clicked.connect(self.add_task)
+        self.add_task_btn.setMaximumWidth(40)
+        self.add_task_btn.setToolTip("Add Task")
+        self.add_task_btn.setEnabled(False)  # Disabled until project is selected
+
+        task_controls_layout.addWidget(self.add_task_btn)
+
+        layout.addLayout(task_controls_layout)
 
         # Task search results counter
         self.task_search_results_label = QLabel("")
         self.task_search_results_label.setStyleSheet("color: #888; font-size: 11px;")
         layout.addWidget(self.task_search_results_label)
-
-        # Task controls
-        task_controls_layout = QHBoxLayout()
-        self.add_task_btn = QPushButton("Add Task")
-        self.add_task_btn.clicked.connect(self.add_task)
-        self.add_task_btn.setEnabled(False)  # Disabled until project is selected
-
-        task_controls_layout.addWidget(self.add_task_btn)
-        task_controls_layout.addStretch()
-
-        layout.addLayout(task_controls_layout)
 
         # Task list
         self.task_list_widget = TaskListWidget()
@@ -388,34 +450,53 @@ class MainWindow(QMainWindow):
     def refresh_data(self):
         """Refresh all data displays."""
         self.refresh_project_list()
+        self.populate_project_tag_filter()
         self.refresh_charts()
         self.refresh_tags()
 
     def refresh_project_list(self):
         """Refresh the project list display."""
         status_filter = self.status_filter.currentText()
+        priority_filter = self.priority_filter.currentText()
+        tag_filter = self.tag_filter.currentText()
         search_text = self.search_input.text().strip()
 
-        # Get all projects or filter by status
-        if status_filter == "All":
-            all_projects = self.db_service.get_projects()
-        else:
-            all_projects = self.db_service.get_projects(status=status_filter)
+        # Get all projects
+        all_projects = self.db_service.get_projects()
+
+        # Apply filters
+        filtered_projects = all_projects
+
+        # Filter by status
+        if status_filter != "All":
+            filtered_projects = [
+                p for p in filtered_projects if p.status == status_filter
+            ]
+
+        # Filter by priority
+        if priority_filter != "All":
+            filtered_projects = [
+                p for p in filtered_projects if p.priority == priority_filter
+            ]
+
+        # Filter by tag
+        if tag_filter != "All":
+            filtered_projects = [p for p in filtered_projects if tag_filter in p.tags]
 
         # Apply fuzzy search if there's a search query
         if search_text:
             search_fields = ["name", "description"]
             search_results = fuzzy_search(
-                search_text, all_projects, search_fields, threshold=0.2
+                search_text, filtered_projects, search_fields, threshold=0.2
             )
             projects = [item for item, score in search_results]
             self.search_results_label.setText(
-                f"Showing {len(projects)} of {len(all_projects)} results"
+                f"Showing {len(projects)} of {len(filtered_projects)} results"
             )
         else:
-            projects = all_projects
+            projects = filtered_projects
             self.search_results_label.setText(
-                f"Showing {len(projects)} of {len(all_projects)} results"
+                f"Showing {len(projects)} of {len(filtered_projects)} results"
             )
 
         self.project_list_widget.update_projects(projects, search_text)
@@ -450,34 +531,76 @@ class MainWindow(QMainWindow):
     def on_project_selected(self, project: Project):
         """Handle project selection."""
         self.current_project_id = project.id
-        self.refresh_task_list(project.id)
-        self.task_search_input.setEnabled(True)  # Enable task search input
-        self.clear_task_search_btn.setEnabled(True)  # Enable clear task search button
+
+        # Enable task search and filters
+        self.task_search_input.setEnabled(True)
+        self.clear_task_search_btn.setEnabled(True)
+        self.task_status_filter.setEnabled(True)
+        self.task_priority_filter.setEnabled(True)
+        self.task_tag_filter.setEnabled(True)
+
+        # Populate task tag filter
+        self.populate_task_tag_filter(project.id)
+
         # Clear task search when switching projects
         self.task_search_input.clear()
         self.task_search_results_label.setText("")
 
+        # Refresh task list after everything is set up
+        self.refresh_task_list(project.id)
+
     def refresh_task_list(self, project_id: int):
         """Refresh the task list for a selected project."""
+        # Check if filters are properly initialized
+        if (
+            not hasattr(self, "task_status_filter")
+            or not hasattr(self, "task_priority_filter")
+            or not hasattr(self, "task_tag_filter")
+        ):
+            return
+
+        status_filter = self.task_status_filter.currentText()
+        priority_filter = self.task_priority_filter.currentText()
+        tag_filter = self.task_tag_filter.currentText()
         search_text = self.task_search_input.text().strip()
 
         # Get all tasks for the project
         all_tasks = self.db_service.get_tasks(project_id=project_id)
 
+        # Apply filters
+        filtered_tasks = all_tasks
+
+        # Filter by status
+        if status_filter != "All":
+            if status_filter == "completed":
+                filtered_tasks = [t for t in filtered_tasks if t.completed]
+            elif status_filter == "pending":
+                filtered_tasks = [t for t in filtered_tasks if not t.completed]
+
+        # Filter by priority
+        if priority_filter != "All":
+            filtered_tasks = [
+                t for t in filtered_tasks if t.priority == priority_filter
+            ]
+
+        # Filter by tag
+        if tag_filter != "All":
+            filtered_tasks = [t for t in filtered_tasks if tag_filter in t.tags]
+
         # Apply fuzzy search if there's a search query
         if search_text:
             search_fields = ["name", "description"]
             search_results = fuzzy_search(
-                search_text, all_tasks, search_fields, threshold=0.2
+                search_text, filtered_tasks, search_fields, threshold=0.2
             )
             tasks = [item for item, score in search_results]
             self.task_search_results_label.setText(
-                f"Showing {len(tasks)} of {len(all_tasks)} tasks"
+                f"Showing {len(tasks)} of {len(filtered_tasks)} tasks"
             )
         else:
-            tasks = all_tasks
+            tasks = filtered_tasks
             self.task_search_results_label.setText(
-                f"Showing {len(tasks)} of {len(all_tasks)} tasks"
+                f"Showing {len(tasks)} of {len(filtered_tasks)} tasks"
             )
 
         self.task_list_widget.update_tasks(tasks, search_text)
@@ -486,6 +609,15 @@ class MainWindow(QMainWindow):
     def on_task_search_text_changed(self):
         """Handle task search text changes."""
         if hasattr(self, "current_project_id") and self.current_project_id:
+            self.refresh_task_list(self.current_project_id)
+
+    def on_task_filter_changed(self):
+        """Handle task filter changes."""
+        if (
+            hasattr(self, "current_project_id")
+            and self.current_project_id
+            and self.current_project_id is not None
+        ):
             self.refresh_task_list(self.current_project_id)
 
     def focus_task_search(self):
@@ -799,6 +931,38 @@ class MainWindow(QMainWindow):
                 )
             else:
                 QMessageBox.warning(self, "Error", f"Tag '{new_tag}' already exists.")
+
+    def populate_project_tag_filter(self):
+        """Populate the project tag filter with all available tags."""
+        self.tag_filter.clear()
+        self.tag_filter.addItem("All")
+
+        # Get all unique tags from projects
+        all_projects = self.db_service.get_projects()
+        all_tags = set()
+        for project in all_projects:
+            if project.tags:
+                all_tags.update(project.tags)
+
+        # Add tags to filter
+        for tag in sorted(all_tags):
+            self.tag_filter.addItem(tag)
+
+    def populate_task_tag_filter(self, project_id: int):
+        """Populate the task tag filter with tags from the selected project's tasks."""
+        self.task_tag_filter.clear()
+        self.task_tag_filter.addItem("All")
+
+        # Get all unique tags from tasks in the project
+        all_tasks = self.db_service.get_tasks(project_id=project_id)
+        all_tags = set()
+        for task in all_tasks:
+            if task.tags:
+                all_tags.update(task.tags)
+
+        # Add tags to filter
+        for tag in sorted(all_tags):
+            self.task_tag_filter.addItem(tag)
 
     def clear_all_data(self):
         """Clear all data from the database."""
