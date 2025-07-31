@@ -5,7 +5,7 @@ This module manages timer functionality including start, stop, and tracking
 of time spent on tasks with enhanced Pomodoro support.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from app.models.timer import Timer
 from app.services.database import DatabaseService
@@ -30,6 +30,9 @@ class TimerController:
         self.active_timer_id: Optional[int] = None
         self.pomodoro_session_count = 0  # Track completed work sessions
         self.autostart_enabled = True  # Auto-start next session
+        self.paused_timer: Optional[Timer] = None  # Store paused timer state
+        self.pause_start_time: Optional[datetime] = None  # When pause started
+        self.total_pause_duration: float = 0.0  # Total pause duration for current timer
 
     def start_timer(
         self,
@@ -60,6 +63,9 @@ class TimerController:
         # Stop any currently active timer
         if self.active_timer_id:
             self.stop_timer()
+
+        # Reset pause duration for new timer
+        self.total_pause_duration = 0.0
 
         # Create new timer in database
         start_time = datetime.now()
@@ -170,10 +176,23 @@ class TimerController:
         if not self.active_timer_id:
             return None
 
-        # Update timer in database
-        end_time = datetime.now()
+        # Store the actual end time (when the timer was actually stopped)
+        actual_end_time = datetime.now()
+
+        # Calculate the effective duration (excluding pause time)
+        effective_duration = None
+        if self.total_pause_duration > 0:
+            # Calculate effective duration by subtracting pause time from raw duration
+            raw_duration = (
+                actual_end_time - self.get_active_timer().start
+            ).total_seconds()
+            effective_duration = int(raw_duration - self.total_pause_duration)
+
+        # Update timer in database with actual end time and effective duration
         db_timer = self.db_service.update_timer(
-            timer_id=self.active_timer_id, end=end_time
+            timer_id=self.active_timer_id,
+            end=actual_end_time,
+            duration=effective_duration,
         )
 
         if db_timer:
@@ -190,9 +209,184 @@ class TimerController:
             )
 
             self.active_timer_id = None
+            # Reset pause tracking
+            self.paused_timer = None
+            self.pause_start_time = None
+            self.total_pause_duration = 0.0
             return finished_timer
 
         return None
+
+    def pause_timer(self) -> Optional[Timer]:
+        """
+        Pause the currently active timer.
+
+        Returns:
+            The paused timer object, or None if no active timer
+        """
+        if not self.active_timer_id:
+            return None
+
+        # Get the current timer
+        active_timer = self.get_active_timer()
+        if not active_timer:
+            return None
+
+        # Store the paused timer state
+        self.paused_timer = active_timer
+        self.pause_start_time = datetime.now()
+
+        # Don't clear the active timer ID - keep it active but paused
+        # This allows the display to continue showing the paused time
+
+        return active_timer
+
+    def resume_timer(self) -> Optional[Timer]:
+        """
+        Resume a paused timer.
+
+        Returns:
+            The resumed timer object, or None if no paused timer
+        """
+        if not self.paused_timer:
+            return None
+
+        # Calculate the pause duration and add it to total pause duration
+        if self.pause_start_time:
+            pause_duration = (datetime.now() - self.pause_start_time).total_seconds()
+            self.total_pause_duration += pause_duration
+
+        # Clear paused state
+        self.paused_timer = None
+        self.pause_start_time = None
+
+        # Get the current timer (no changes needed to database)
+        return self.get_active_timer()
+
+    def skip_pomodoro_session(
+        self,
+        work_duration: int = 25,
+        short_break_duration: int = 5,
+        long_break_duration: int = 15,
+        work_count_down: bool = True,
+        short_break_count_down: bool = True,
+        long_break_count_down: bool = True,
+    ) -> Optional[Timer]:
+        """
+        Skip the current Pomodoro session and move to the next one.
+
+        Args:
+            work_duration: Work session duration in minutes
+            short_break_duration: Short break duration in minutes
+            long_break_duration: Long break duration in minutes
+            work_count_down: Whether work sessions count down
+            short_break_count_down: Whether short breaks count down
+            long_break_count_down: Whether long breaks count down
+
+        Returns:
+            The completed timer object, or None if no active timer
+        """
+        if not self.active_timer_id:
+            return None
+
+        # Stop the current timer (mark it as completed)
+        completed_timer = self.stop_timer()
+
+        if completed_timer and completed_timer.type == "pomodoro":
+            # Determine next session type
+            next_session_type = self.get_next_pomodoro_session_type()
+
+            # Start the next session
+            if next_session_type == "work":
+                self.pomodoro_session_count += 1
+                return self.start_pomodoro_session(
+                    task_id=completed_timer.task_id,
+                    session_type="work",
+                    work_duration=work_duration,
+                    short_break_duration=short_break_duration,
+                    long_break_duration=long_break_duration,
+                    work_count_down=work_count_down,
+                    short_break_count_down=short_break_count_down,
+                    long_break_count_down=long_break_count_down,
+                )
+            else:
+                return self.start_pomodoro_session(
+                    task_id=completed_timer.task_id,
+                    session_type=next_session_type,
+                    work_duration=work_duration,
+                    short_break_duration=short_break_duration,
+                    long_break_duration=long_break_duration,
+                    work_count_down=work_count_down,
+                    short_break_count_down=short_break_count_down,
+                    long_break_count_down=long_break_count_down,
+                )
+
+        return completed_timer
+
+    def reset_pomodoro_cycle(self) -> None:
+        """
+        Reset the Pomodoro cycle to the first work session.
+        """
+        self.pomodoro_session_count = 0
+        if self.active_timer_id:
+            self.stop_timer()
+
+    def is_timer_paused(self) -> bool:
+        """
+        Check if there's a paused timer.
+
+        Returns:
+            True if there's a paused timer, False otherwise
+        """
+        return self.paused_timer is not None
+
+    def get_elapsed_at_pause(self) -> float:
+        """
+        Get the elapsed time at the moment the timer was paused.
+
+        Returns:
+            Elapsed time in seconds at pause, or 0 if not paused
+        """
+        if not self.paused_timer or not self.pause_start_time:
+            return 0.0
+
+        # Calculate the raw elapsed time at pause
+        raw_elapsed_at_pause = (
+            self.pause_start_time - self.paused_timer.start
+        ).total_seconds()
+
+        # Calculate the pause duration that occurred before this pause
+        previous_pause_duration = self.total_pause_duration
+
+        # Return the effective elapsed time at pause (excluding previous pauses)
+        effective_elapsed_at_pause = raw_elapsed_at_pause - previous_pause_duration
+
+        return max(0.0, effective_elapsed_at_pause)
+
+    def get_effective_elapsed_time(self, timer: Timer) -> float:
+        """
+        Get the effective elapsed time for a timer, accounting for pauses.
+
+        Args:
+            timer: The timer object
+
+        Returns:
+            Effective elapsed time in seconds (excluding pause time)
+        """
+        if not timer:
+            return 0.0
+
+        # Calculate raw elapsed time
+        if timer.end:
+            raw_elapsed = (timer.end - timer.start).total_seconds()
+        else:
+            raw_elapsed = (datetime.now() - timer.start).total_seconds()
+
+        # Subtract total pause duration
+        effective_elapsed = raw_elapsed - self.total_pause_duration
+
+        # Ensure we don't return negative time
+        return max(0.0, effective_elapsed)
 
     def get_active_timer(self) -> Optional[Timer]:
         """
@@ -208,7 +402,7 @@ class TimerController:
         active_timer = next((t for t in db_timer if t.id == self.active_timer_id), None)
 
         if active_timer:
-            return Timer(
+            timer = Timer(
                 id=active_timer.id,
                 task_id=active_timer.task_id,
                 start=active_timer.start,
@@ -218,6 +412,8 @@ class TimerController:
                 pomodoro_session_type=active_timer.pomodoro_session_type,
                 pomodoro_session_number=active_timer.pomodoro_session_number,
             )
+
+            return timer
 
         return None
 

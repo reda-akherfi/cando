@@ -171,8 +171,15 @@ class TimerHistoryDialog(QDialog):
 
             # Duration
             if timer.end:
-                duration = timer.end - timer.start
-                hours, remainder = divmod(duration.total_seconds(), 3600)
+                if timer.duration is not None:
+                    # Use stored effective duration (for timers with pauses)
+                    duration_seconds = timer.duration
+                else:
+                    # Calculate raw duration (for timers without pauses)
+                    duration = timer.end - timer.start
+                    duration_seconds = duration.total_seconds()
+
+                hours, remainder = divmod(duration_seconds, 3600)
                 minutes, seconds = divmod(remainder, 60)
                 duration_str = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
             else:
