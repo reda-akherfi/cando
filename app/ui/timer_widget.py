@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QMessageBox,
     QCheckBox,
+    QRadioButton,
+    QButtonGroup,
 )
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtGui import QFont
@@ -96,11 +98,27 @@ class TimerWidget(QWidget):
 
         # Timer mode selection
         mode_group = QGroupBox("Timer Mode")
-        mode_layout = QVBoxLayout(mode_group)
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["Stopwatch", "Countdown", "Pomodoro"])
-        self.mode_combo.currentTextChanged.connect(self.on_mode_changed)
-        mode_layout.addWidget(self.mode_combo)
+        mode_layout = QHBoxLayout(mode_group)
+
+        # Create radio buttons for timer modes
+        self.mode_button_group = QButtonGroup()
+
+        self.stopwatch_radio = QRadioButton("Stopwatch")
+        self.stopwatch_radio.setChecked(True)  # Default selection
+        self.mode_button_group.addButton(self.stopwatch_radio)
+        mode_layout.addWidget(self.stopwatch_radio)
+
+        self.countdown_radio = QRadioButton("Countdown")
+        self.mode_button_group.addButton(self.countdown_radio)
+        mode_layout.addWidget(self.countdown_radio)
+
+        self.pomodoro_radio = QRadioButton("Pomodoro")
+        self.mode_button_group.addButton(self.pomodoro_radio)
+        mode_layout.addWidget(self.pomodoro_radio)
+
+        # Connect the button group to the mode change handler
+        self.mode_button_group.buttonClicked.connect(self.on_mode_changed)
+
         layout.addWidget(mode_group)
 
         # Countdown settings
@@ -290,24 +308,25 @@ class TimerWidget(QWidget):
         self.update_start_button_state()
         self._sync_in_progress = False
 
-    def on_mode_changed(self, mode: str):
+    def on_mode_changed(self, button):
         """Handle timer mode changes."""
-        self.countdown_group.setVisible(mode in ["Countdown"])
-        self.pomodoro_group.setVisible(mode == "Pomodoro")
-        self.progress_bar.setVisible(mode in ["Countdown", "Pomodoro"])
+        mode = button.text().lower()
+        self.countdown_group.setVisible(mode == "countdown")
+        self.pomodoro_group.setVisible(mode == "pomodoro")
+        self.progress_bar.setVisible(mode in ["countdown", "pomodoro"])
 
-        if mode == "Pomodoro":
+        if mode == "pomodoro":
             # Set default Pomodoro duration
             self.minutes_spin.setValue(self.work_duration)
             self.seconds_spin.setValue(0)
-        elif mode == "Countdown":
+        elif mode == "countdown":
             self.minutes_spin.setValue(30)
             self.seconds_spin.setValue(0)
 
     def on_work_duration_changed(self, value: int):
         """Handle work duration change."""
         self.work_duration = value
-        if self.mode_combo.currentText() == "Pomodoro":
+        if self.get_current_mode() == "pomodoro":
             self.minutes_spin.setValue(value)
 
     def on_short_break_changed(self, value: int):
@@ -325,6 +344,17 @@ class TimerWidget(QWidget):
     def on_autostart_work_changed(self, checked: bool):
         """Handle autostart work setting change."""
         self.autostart_work = checked
+
+    def get_current_mode(self):
+        """Get the currently selected timer mode from radio buttons."""
+        if self.stopwatch_radio.isChecked():
+            return "stopwatch"
+        elif self.countdown_radio.isChecked():
+            return "countdown"
+        elif self.pomodoro_radio.isChecked():
+            return "pomodoro"
+        else:
+            return "stopwatch"  # Default fallback
 
     def update_start_button_state(self):
         """Update the start button enabled state based on current selection."""
@@ -356,7 +386,7 @@ class TimerWidget(QWidget):
                 )
             return
 
-        mode = self.mode_combo.currentText().lower()
+        mode = self.get_current_mode()
 
         if mode == "pomodoro":
             # Start a Pomodoro work session
@@ -418,7 +448,7 @@ class TimerWidget(QWidget):
         active_timer = self.timer_controller.get_active_timer()
 
         if active_timer:
-            mode = self.mode_combo.currentText().lower()
+            mode = self.get_current_mode()
 
             if mode == "pomodoro" and active_timer.duration:
                 # Pomodoro countdown mode
