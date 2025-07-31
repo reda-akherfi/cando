@@ -65,6 +65,7 @@ class TimerWidget(QWidget):
         self.setup_ui()
         self.refresh_projects()
         self.update_display()
+        self.update_start_button_state()  # Set initial button state
 
     def setup_ui(self):
         """Set up the timer user interface."""
@@ -265,6 +266,9 @@ class TimerWidget(QWidget):
             self.task_combo.addItem("Select a task...", None)
             # Emit signal for synchronization
             self.project_selected.emit(None)
+
+        # Update start button state
+        self.update_start_button_state()
         self._sync_in_progress = False
 
     def on_task_selected(self, index: int):
@@ -281,6 +285,9 @@ class TimerWidget(QWidget):
             self.current_task = None
             # Emit signal for synchronization
             self.task_selected.emit(None)
+
+        # Update start button state
+        self.update_start_button_state()
         self._sync_in_progress = False
 
     def on_mode_changed(self, mode: str):
@@ -318,6 +325,23 @@ class TimerWidget(QWidget):
     def on_autostart_work_changed(self, checked: bool):
         """Handle autostart work setting change."""
         self.autostart_work = checked
+
+    def update_start_button_state(self):
+        """Update the start button enabled state based on current selection."""
+        can_start = self.current_task is not None
+        self.start_button.setEnabled(can_start)
+
+        # Update button text and styling based on state
+        if can_start:
+            self.start_button.setText("Start")
+            self.start_button.setStyleSheet("")
+        else:
+            # Provide more specific guidance based on what's missing
+            if self.current_project_id is None:
+                self.start_button.setText("Select Project")
+            else:
+                self.start_button.setText("Select Task")
+            self.start_button.setStyleSheet("color: #888;")
 
     def start_timer(self):
         """Start the timer."""
@@ -637,6 +661,7 @@ class TimerWidget(QWidget):
                 self.task_combo.setCurrentIndex(i)
                 break
         self._sync_in_progress = False
+        self.update_start_button_state()
 
     def set_current_project(self, project_id: int):
         """Set the current project externally."""
@@ -651,6 +676,7 @@ class TimerWidget(QWidget):
                 self.refresh_tasks(project_id)
                 break
         self._sync_in_progress = False
+        self.update_start_button_state()
 
     def set_current_project_and_task(self, project_id: int, task: Task):
         """Set both project and task externally."""
@@ -663,3 +689,4 @@ class TimerWidget(QWidget):
         if task:
             self.set_current_task(task)
         self._sync_in_progress = False
+        self.update_start_button_state()
