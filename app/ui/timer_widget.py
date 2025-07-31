@@ -144,22 +144,7 @@ class TimerWidget(QWidget):
         self.view_history_button.setToolTip("View Timer History")
         self.view_history_button.clicked.connect(self.open_timer_history)
         self.view_history_button.setMinimumSize(60, 30)
-        self.view_history_button.setStyleSheet(
-            """
-            QPushButton {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                background-color: #f8f8f8;
-                padding: 4px 8px;
-            }
-            QPushButton:hover {
-                background-color: #e0e0e0;
-            }
-            QPushButton:pressed {
-                background-color: #d0d0d0;
-            }
-        """
-        )
+        # Button styling is now handled by the application's theme
         mode_layout.addWidget(self.view_history_button)
 
         # Settings button (cog wheel)
@@ -170,25 +155,7 @@ class TimerWidget(QWidget):
         self.settings_button.clicked.connect(self.open_settings_dialog)
         # Set a minimum size to ensure the button is visible
         self.settings_button.setMinimumSize(30, 30)
-        # Style the button to make it look more like a settings button
-        self.settings_button.setStyleSheet(
-            """
-            QToolButton {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                background-color: #f8f8f8;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QToolButton:hover {
-                background-color: #e0e0e0;
-            }
-            QToolButton:disabled {
-                background-color: #f0f0f0;
-                color: #999;
-            }
-        """
-        )
+        # Button styling is now handled by the application's theme
         mode_layout.addWidget(self.settings_button)
 
         # Add spacer to push buttons to the left
@@ -205,12 +172,12 @@ class TimerWidget(QWidget):
         self.time_label = QLabel("00:00:00")
         self.time_label.setAlignment(Qt.AlignCenter)
         self.time_label.setFont(QFont("Arial", 48, QFont.Bold))
-        self.time_label.setStyleSheet("color: #4CAF50;")
+        self.time_label.setProperty("class", "time-display")
         display_layout.addWidget(self.time_label)
 
         self.status_label = QLabel("Ready to start")
         self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet("color: #888; font-size: 14px;")
+        self.status_label.setProperty("class", "secondary-text")
         display_layout.addWidget(self.status_label)
         layout.addWidget(display_group)
 
@@ -478,14 +445,14 @@ class TimerWidget(QWidget):
         # Update button text and styling based on state
         if can_start:
             self.start_button.setText("Start")
-            self.start_button.setStyleSheet("")
+            # Button styling is now handled by the application's theme
         else:
             # Provide more specific guidance based on what's missing
             if self.current_project_id is None:
                 self.start_button.setText("Select Project")
             else:
                 self.start_button.setText("Select Task")
-            self.start_button.setStyleSheet("color: #888;")
+            # Button styling is now handled by the application's theme
 
     def start_timer(self):
         """Start or continue the timer."""

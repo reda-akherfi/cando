@@ -60,9 +60,7 @@ class TimerHistoryDialog(QDialog):
 
         # Title
         title_label = QLabel("Recent Timer Sessions")
-        title_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold; margin-bottom: 10px;"
-        )
+        title_label.setProperty("class", "chart-title")
         layout.addWidget(title_label)
 
         # Create table
@@ -95,26 +93,8 @@ class TimerHistoryDialog(QDialog):
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Duration
         header.setSectionResizeMode(6, QHeaderView.Stretch)  # Session Info
 
-        # Set table style
-        self.table.setStyleSheet(
-            """
-            QTableWidget {
-                gridline-color: #d0d0d0;
-                background-color: white;
-                alternate-background-color: #f8f8f8;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #e0e0e0;
-            }
-            QHeaderView::section {
-                background-color: #f0f0f0;
-                padding: 8px;
-                border: 1px solid #d0d0d0;
-                font-weight: bold;
-            }
-        """
-        )
+        # Table styling is now handled by the application's theme
+        # No need for hardcoded styles here
 
         layout.addWidget(self.table)
 

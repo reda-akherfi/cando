@@ -1153,3 +1153,125 @@ class DatabaseService:
                 "short_break_count_down": True,
                 "long_break_count_down": True,
             }
+
+    def save_theme_settings(self, theme_config: dict) -> bool:
+        """Save theme settings to the database."""
+        try:
+            import json
+
+            self.set_config("theme_config", json.dumps(theme_config))
+            return True
+        except Exception as e:
+            print(f"Error saving theme settings: {e}")
+            return False
+
+    def load_theme_settings(self) -> dict:
+        """Load theme settings from the database."""
+        try:
+            import json
+
+            theme_json = self.get_config("theme_config", None)
+            if theme_json:
+                return json.loads(theme_json)
+        except Exception as e:
+            print(f"Error loading theme settings: {e}")
+        return None
+
+    def save_general_settings(self, settings: dict) -> bool:
+        """Save general settings to the database."""
+        try:
+            for key, value in settings.items():
+                self.set_config(f"general_{key}", str(value))
+            return True
+        except Exception as e:
+            print(f"Error saving general settings: {e}")
+            return False
+
+    def load_general_settings(self) -> dict:
+        """Load general settings from the database."""
+        try:
+            return {
+                "start_maximized": self.get_config(
+                    "general_start_maximized", "False"
+                ).lower()
+                == "true",
+                "auto_save_interval": int(
+                    self.get_config("general_auto_save_interval", "5")
+                ),
+                "language": self.get_config("general_language", "English"),
+                "show_tooltips": self.get_config(
+                    "general_show_tooltips", "True"
+                ).lower()
+                == "true",
+                "confirm_deletions": self.get_config(
+                    "general_confirm_deletions", "True"
+                ).lower()
+                == "true",
+                "show_status_bar": self.get_config(
+                    "general_show_status_bar", "True"
+                ).lower()
+                == "true",
+                "chart_update_frequency": int(
+                    self.get_config("general_chart_update_frequency", "5")
+                ),
+                "cache_size": int(self.get_config("general_cache_size", "100")),
+            }
+        except Exception as e:
+            print(f"Error loading general settings: {e}")
+            return {
+                "start_maximized": False,
+                "auto_save_interval": 5,
+                "language": "English",
+                "show_tooltips": True,
+                "confirm_deletions": True,
+                "show_status_bar": True,
+                "chart_update_frequency": 5,
+                "cache_size": 100,
+            }
+
+    def save_notification_settings(self, settings: dict) -> bool:
+        """Save notification settings to the database."""
+        try:
+            for key, value in settings.items():
+                self.set_config(f"notification_{key}", str(value))
+            return True
+        except Exception as e:
+            print(f"Error saving notification settings: {e}")
+            return False
+
+    def load_notification_settings(self) -> dict:
+        """Load notification settings from the database."""
+        try:
+            return {
+                "notify_success": self.get_config(
+                    "notification_notify_success", "True"
+                ).lower()
+                == "true",
+                "notify_error": self.get_config(
+                    "notification_notify_error", "True"
+                ).lower()
+                == "true",
+                "notify_warning": self.get_config(
+                    "notification_notify_warning", "True"
+                ).lower()
+                == "true",
+                "notify_info": self.get_config(
+                    "notification_notify_info", "True"
+                ).lower()
+                == "true",
+                "duration": int(self.get_config("notification_duration", "5")),
+                "position": self.get_config("notification_position", "Top-Right"),
+                "sound": self.get_config("notification_sound", "True").lower()
+                == "true",
+            }
+        except Exception as e:
+            print(f"Error loading notification settings: {e}")
+            return {
+                "notify_success": True,
+                "notify_error": True,
+                "notify_warning": True,
+                "notify_info": True,
+                "duration": 5,
+                "position": "Top-Right",
+                "sound": True,
+            }

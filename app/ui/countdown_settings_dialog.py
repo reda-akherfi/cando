@@ -36,7 +36,7 @@ class CountdownSettingsDialog(QDialog):
         """Set up the user interface."""
         self.setWindowTitle("Countdown Settings")
         self.setModal(True)
-        self.setFixedSize(300, 200)
+        self.setFixedSize(400, 280)
 
         # Center the dialog on the parent
         if self.parent():

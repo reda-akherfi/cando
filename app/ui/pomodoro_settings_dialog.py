@@ -50,7 +50,7 @@ class PomodoroSettingsDialog(QDialog):
         """Set up the user interface."""
         self.setWindowTitle("Pomodoro Settings")
         self.setModal(True)
-        self.setFixedSize(350, 350)
+        self.setFixedSize(450, 450)
 
         # Center the dialog on the parent
         if self.parent():

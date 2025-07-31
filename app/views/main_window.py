@@ -40,6 +40,7 @@ from app.ui.tag_dialog import TagDialog
 from app.ui.tag_list_widget import TagListWidget
 from app.ui.timer_widget import TimerWidget
 from app.ui.notification_widget import NotificationManager
+from app.ui.settings_widget import SettingsWidget
 from app.ui.ui_main import UiMainWindow
 from app.models.project import Project
 from app.models.task import Task
@@ -86,6 +87,68 @@ class MainWindow(QMainWindow):
         self.notification_manager = NotificationManager(self)
 
         self.setup_tabs()
+
+        # Load and apply theme during initialization
+        theme_config = self.db_service.load_theme_settings()
+        if not theme_config:
+            # Use default dark theme if no theme is found
+            theme_config = {
+                "name": "Custom Theme",
+                "colors": {
+                    # Background colors
+                    "window": "#1e1e1e",
+                    "base": "#2d2d30",
+                    "alternate_base": "#252526",
+                    "tool_tip_base": "#2d2d30",
+                    "tool_tip_text": "#cccccc",
+                    # Text colors
+                    "text": "#cccccc",
+                    "bright_text": "#ffffff",
+                    "button_text": "#cccccc",
+                    "link": "#0078d4",
+                    "link_visited": "#68217a",
+                    # Button colors
+                    "button": "#3c3c3c",
+                    "light": "#4c4c4c",
+                    "midlight": "#3c3c3c",
+                    "mid": "#2d2d30",
+                    "dark": "#1e1e1e",
+                    "shadow": "#0f0f0f",
+                    # Highlight colors
+                    "highlight": "#0078d4",
+                    "highlighted_text": "#ffffff",
+                    # Chart colors
+                    "chart_background": "#1e1e1e",
+                    "chart_text": "#cccccc",
+                    "chart_grid": "#404040",
+                    "chart_primary": "#0078d4",
+                    "chart_secondary": "#68217a",
+                    "chart_success": "#107c10",
+                    "chart_warning": "#ff8c00",
+                    "chart_error": "#e81123",
+                    # Priority colors
+                    "priority_low": "#00ff00",
+                    "priority_medium": "#ffff00",
+                    "priority_high": "#ff8800",
+                    "priority_critical": "#ff0000",
+                    # Status colors
+                    "status_active": "#00ff00",
+                    "status_in_progress": "#00aaff",
+                    "status_on_hold": "#ffff00",
+                    "status_completed": "#00ff00",
+                    "status_cancelled": "#ff0000",
+                },
+                "fonts": {
+                    "base_size": 14,
+                    "title_size": 18,
+                    "subtitle_size": 16,
+                    "font_family": "Segoe UI",
+                },
+                "spacing": {"padding": 8, "margin": 4, "border_radius": 4},
+            }
+
+        self.apply_theme_from_config(theme_config)
+
         self.refresh_data()
 
     def setup_tabs(self):
@@ -128,18 +191,20 @@ class MainWindow(QMainWindow):
         # Create navigation controls
         nav_layout = QHBoxLayout()
 
+        # Chart title label
+        self.chart_title_label = QLabel("Time by Project")
+        self.chart_title_label.setAlignment(Qt.AlignCenter)
+        self.chart_title_label.setProperty("class", "chart-title")
+
+        # Navigation arrows (grouped together)
+        arrows_layout = QHBoxLayout()
+        arrows_layout.setSpacing(5)  # Small spacing between arrows
+
         # Left arrow button
         self.prev_chart_btn = QPushButton("←")
         self.prev_chart_btn.setMaximumWidth(50)
         self.prev_chart_btn.clicked.connect(self.show_previous_chart)
         self.prev_chart_btn.setToolTip("Previous Chart")
-
-        # Chart title label
-        self.chart_title_label = QLabel("Time by Project")
-        self.chart_title_label.setAlignment(Qt.AlignCenter)
-        self.chart_title_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold; margin: 10px;"
-        )
 
         # Right arrow button
         self.next_chart_btn = QPushButton("→")
@@ -147,9 +212,12 @@ class MainWindow(QMainWindow):
         self.next_chart_btn.clicked.connect(self.show_next_chart)
         self.next_chart_btn.setToolTip("Next Chart")
 
-        nav_layout.addWidget(self.prev_chart_btn)
+        arrows_layout.addWidget(self.prev_chart_btn)
+        arrows_layout.addWidget(self.next_chart_btn)
+
         nav_layout.addWidget(self.chart_title_label)
-        nav_layout.addWidget(self.next_chart_btn)
+        nav_layout.addStretch()  # Push arrows to the right
+        nav_layout.addLayout(arrows_layout)
 
         # Create stacked widget for charts
         self.chart_stack = QStackedWidget()
@@ -191,7 +259,6 @@ class MainWindow(QMainWindow):
         controls_layout = QHBoxLayout()
 
         # Search functionality
-        search_label = QLabel("Search:")
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(
             "Search projects by name, description, or tags... (Ctrl+F)"
@@ -212,13 +279,12 @@ class MainWindow(QMainWindow):
         # Add clear button
         self.clear_search_btn = QPushButton("Clear")
         self.clear_search_btn.clicked.connect(self.clear_search)
-        self.clear_search_btn.setMaximumWidth(60)
+        self.clear_search_btn.setMaximumWidth(70)
 
         search_layout = QHBoxLayout()
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(self.clear_search_btn)
 
-        controls_layout.addWidget(search_label)
         controls_layout.addLayout(search_layout)
 
         # Filter controls
@@ -265,7 +331,7 @@ class MainWindow(QMainWindow):
 
         # Search results counter
         self.search_results_label = QLabel("")
-        self.search_results_label.setStyleSheet("color: #888; font-size: 11px;")
+        self.search_results_label.setProperty("class", "secondary-text")
         projects_layout.addWidget(self.search_results_label)
 
         # Project list
@@ -283,7 +349,6 @@ class MainWindow(QMainWindow):
         task_controls_layout = QHBoxLayout()
 
         # Task search
-        task_search_label = QLabel("Search Tasks:")
         self.task_search_input = QLineEdit()
         self.task_search_input.setPlaceholderText(
             "Search tasks by name, description, or tags... (Ctrl+Shift+F)"
@@ -303,7 +368,7 @@ class MainWindow(QMainWindow):
         # Add clear button for task search
         self.clear_task_search_btn = QPushButton("Clear")
         self.clear_task_search_btn.clicked.connect(self.clear_task_search)
-        self.clear_task_search_btn.setMaximumWidth(60)
+        self.clear_task_search_btn.setMaximumWidth(70)
         self.clear_task_search_btn.setEnabled(
             False
         )  # Disabled until project is selected
@@ -312,7 +377,6 @@ class MainWindow(QMainWindow):
         task_search_layout.addWidget(self.task_search_input)
         task_search_layout.addWidget(self.clear_task_search_btn)
 
-        task_controls_layout.addWidget(task_search_label)
         task_controls_layout.addLayout(task_search_layout)
 
         # Task filters
@@ -365,7 +429,7 @@ class MainWindow(QMainWindow):
 
         # Task search results counter
         self.task_search_results_label = QLabel("")
-        self.task_search_results_label.setStyleSheet("color: #888; font-size: 11px;")
+        self.task_search_results_label.setProperty("class", "secondary-text")
         tasks_layout.addWidget(self.task_search_results_label)
 
         # Task list
@@ -413,43 +477,14 @@ class MainWindow(QMainWindow):
         """Set up the settings tab for application configuration."""
         layout = QVBoxLayout(self.settings_tab)
 
-        # Add theme toggle
-        theme_layout = QHBoxLayout()
-        theme_label = QLabel("Theme:")
-        self.theme_button = QPushButton("Switch to Light Mode")
-        self.theme_button.clicked.connect(self.toggle_theme)
-        theme_layout.addWidget(theme_label)
-        theme_layout.addWidget(self.theme_button)
-        theme_layout.addStretch()
+        # Create the settings widget
+        self.settings_widget = SettingsWidget()
+        self.settings_widget.settings_changed.connect(self.on_settings_changed)
 
-        # Add window behavior settings
-        window_layout = QHBoxLayout()
-        window_label = QLabel("Always open in maximized mode:")
-        self.maximized_checkbox = QCheckBox()
-        self.maximized_checkbox.setChecked(
-            self.db_service.get_config("always_maximized", "true").lower() == "true"
-        )
-        self.maximized_checkbox.toggled.connect(self.on_maximized_setting_changed)
-        window_layout.addWidget(window_label)
-        window_layout.addWidget(self.maximized_checkbox)
-        window_layout.addStretch()
+        # Load current settings
+        self.load_settings_into_widget()
 
-        # Add settings controls
-        clear_data_btn = QPushButton("Clear All Data")
-        clear_data_btn.clicked.connect(self.clear_all_data)
-
-        reset_data_btn = QPushButton("Reset to Sample Data")
-        reset_data_btn.clicked.connect(self.reset_to_sample_data)
-
-        # Add widgets to layout
-        layout.addWidget(QLabel("Appearance"))
-        layout.addLayout(theme_layout)
-        layout.addWidget(QLabel("Window Behavior"))
-        layout.addLayout(window_layout)
-        layout.addWidget(QLabel("Database Settings"))
-        layout.addWidget(clear_data_btn)
-        layout.addWidget(reset_data_btn)
-        layout.addStretch()
+        layout.addWidget(self.settings_widget)
 
     def setup_tags_tab(self):
         """Set up the tags tab for managing tags."""
@@ -476,7 +511,7 @@ class MainWindow(QMainWindow):
         # Add clear button for tag search
         self.clear_tag_search_btn = QPushButton("Clear")
         self.clear_tag_search_btn.clicked.connect(self.clear_tag_search)
-        self.clear_tag_search_btn.setMaximumWidth(60)
+        self.clear_tag_search_btn.setMaximumWidth(70)
 
         # Sort controls
         sort_label = QLabel("Sort by:")
@@ -502,7 +537,7 @@ class MainWindow(QMainWindow):
 
         # Tag search results counter
         self.tag_search_results_label = QLabel("")
-        self.tag_search_results_label.setStyleSheet("color: #888; font-size: 11px;")
+        self.tag_search_results_label.setProperty("class", "secondary-text")
         layout.addWidget(self.tag_search_results_label)
 
         # Tag list
@@ -538,6 +573,657 @@ class MainWindow(QMainWindow):
     def on_maximized_setting_changed(self, checked: bool):
         """Handle changes to the maximized setting."""
         self.db_service.set_config("always_maximized", "true" if checked else "false")
+
+    def on_settings_changed(self, settings_data: dict):
+        """Handle settings changes from the settings widget."""
+        settings_type = settings_data.get("type")
+        config = settings_data.get("config", {})
+
+        if settings_type == "theme":
+            self.apply_custom_theme(config)
+        elif settings_type == "general":
+            self.db_service.save_general_settings(config)
+        elif settings_type == "timer":
+            self.db_service.save_timer_settings(config)
+        elif settings_type == "notifications":
+            self.db_service.save_notification_settings(config)
+
+        # Show success notification
+        if self.notification_manager:
+            self.notification_manager.show_success(
+                "Settings Saved", "Your settings have been saved successfully!"
+            )
+
+    def load_settings_into_widget(self):
+        """Load current settings into the settings widget."""
+        # Load theme settings
+        theme_config = self.db_service.load_theme_settings()
+        if theme_config and hasattr(self.settings_widget, "theme_config"):
+            self.settings_widget.theme_config.set_theme_config(theme_config)
+
+        # Load general settings
+        general_settings = self.db_service.load_general_settings()
+        if hasattr(self.settings_widget, "start_maximized_check"):
+            self.settings_widget.start_maximized_check.setChecked(
+                general_settings.get("start_maximized", False)
+            )
+            self.settings_widget.auto_save_spin.setValue(
+                general_settings.get("auto_save_interval", 5)
+            )
+            self.settings_widget.language_combo.setCurrentText(
+                general_settings.get("language", "English")
+            )
+            self.settings_widget.show_tooltips_check.setChecked(
+                general_settings.get("show_tooltips", True)
+            )
+            self.settings_widget.confirm_deletions_check.setChecked(
+                general_settings.get("confirm_deletions", True)
+            )
+            self.settings_widget.show_status_bar_check.setChecked(
+                general_settings.get("show_status_bar", True)
+            )
+            self.settings_widget.chart_update_spin.setValue(
+                general_settings.get("chart_update_frequency", 5)
+            )
+            self.settings_widget.cache_size_spin.setValue(
+                general_settings.get("cache_size", 100)
+            )
+
+        # Load notification settings
+        notification_settings = self.db_service.load_notification_settings()
+        if hasattr(self.settings_widget, "notify_success"):
+            self.settings_widget.notify_success.setChecked(
+                notification_settings.get("notify_success", True)
+            )
+            self.settings_widget.notify_error.setChecked(
+                notification_settings.get("notify_error", True)
+            )
+            self.settings_widget.notify_warning.setChecked(
+                notification_settings.get("notify_warning", True)
+            )
+            self.settings_widget.notify_info.setChecked(
+                notification_settings.get("notify_info", True)
+            )
+            self.settings_widget.notify_duration.setValue(
+                notification_settings.get("duration", 5)
+            )
+            self.settings_widget.notify_position.setCurrentText(
+                notification_settings.get("position", "Top-Right")
+            )
+            self.settings_widget.notify_sound.setChecked(
+                notification_settings.get("sound", True)
+            )
+
+    def apply_custom_theme(self, theme_config: dict):
+        """Apply a custom theme configuration."""
+        try:
+            # Save theme to database
+            self.db_service.save_theme_settings(theme_config)
+
+            # Apply theme to application
+            self.apply_theme_from_config(theme_config)
+
+        except Exception as e:
+            print(f"Error applying custom theme: {e}")
+            if self.notification_manager:
+                self.notification_manager.show_error(
+                    "Theme Error", f"Failed to apply theme: {str(e)}"
+                )
+
+    def apply_theme_from_config(self, theme_config: dict):
+        """Apply theme from configuration dictionary."""
+        try:
+            from PySide6.QtWidgets import QApplication
+            from PySide6.QtGui import QPalette, QColor
+
+            app = QApplication.instance()
+            if not app:
+                return
+
+            # Create palette from theme config
+            palette = QPalette()
+            colors = theme_config.get("colors", {})
+
+            # Apply colors to palette
+            if "window" in colors:
+                palette.setColor(QPalette.Window, QColor(colors["window"]))
+            if "text" in colors:
+                palette.setColor(QPalette.WindowText, QColor(colors["text"]))
+            if "base" in colors:
+                palette.setColor(QPalette.Base, QColor(colors["base"]))
+            if "text" in colors:
+                palette.setColor(QPalette.Text, QColor(colors["text"]))
+            if "button" in colors:
+                palette.setColor(QPalette.Button, QColor(colors["button"]))
+            if "button_text" in colors:
+                palette.setColor(QPalette.ButtonText, QColor(colors["button_text"]))
+            if "highlight" in colors:
+                palette.setColor(QPalette.Highlight, QColor(colors["highlight"]))
+            if "highlighted_text" in colors:
+                palette.setColor(
+                    QPalette.HighlightedText, QColor(colors["highlighted_text"])
+                )
+
+            # Apply palette to application
+            app.setPalette(palette)
+
+            # Apply custom stylesheet if available
+            self.apply_custom_stylesheet(theme_config)
+
+        except Exception as e:
+            print(f"Error applying theme from config: {e}")
+
+    def apply_custom_stylesheet(self, theme_config: dict):
+        """Apply custom stylesheet based on theme configuration."""
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            app = QApplication.instance()
+            if not app:
+                return
+
+            colors = theme_config.get("colors", {})
+            fonts = theme_config.get("fonts", {})
+            spacing = theme_config.get("spacing", {})
+
+            # Build custom stylesheet
+            stylesheet = f"""
+            QMainWindow {{
+                background-color: {colors.get('window', '#1e1e1e')};
+                color: {colors.get('text', '#cccccc')};
+            }}
+            
+            QTabWidget::pane {{
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                background-color: {colors.get('base', '#2d2d30')};
+            }}
+            
+            QTabBar::tab {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                color: {colors.get('text', '#cccccc')};
+                padding: {spacing.get('padding', 8)}px {spacing.get('padding', 8) * 2}px;
+                margin-right: 2px;
+                border-top-left-radius: {spacing.get('border_radius', 4)}px;
+                border-top-right-radius: {spacing.get('border_radius', 4)}px;
+            }}
+            
+            QTabBar::tab:selected {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                color: {colors.get('highlighted_text', '#ffffff')};
+            }}
+            
+            QTabBar::tab:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+            }}
+            
+            QPushButton {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                padding: {spacing.get('padding', 8)}px {spacing.get('padding', 8) * 2}px;
+                border-radius: {spacing.get('border_radius', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+                font-weight: normal;
+                outline: none;
+                margin: 1px;
+                min-height: 20px;
+                text-align: center;
+            }}
+            
+            QPushButton:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QPushButton:pressed {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QPushButton:disabled {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+                color: {colors.get('mid', '#2d2d30')};
+                border-color: {colors.get('dark', '#1e1e1e')};
+            }}
+            
+            QLabel {{
+                color: {colors.get('text', '#cccccc')};
+                background-color: transparent;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QLabel[class="secondary-text"] {{
+                color: #888888;
+                font-size: 11px;
+            }}
+            
+            QLabel[class="time-display"] {{
+                color: {colors.get('highlight', '#0078d4')};
+                font-size: 48px;
+                font-weight: bold;
+            }}
+            
+            QLabel[class="chart-title"] {{
+                color: {colors.get('text', '#cccccc')};
+                font-size: 16px;
+                font-weight: bold;
+                margin: 10px;
+            }}
+            
+            QListWidget {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                alternate-background-color: {colors.get('alternate_base', '#252526')};
+            }}
+            
+            QListWidget::item {{
+                padding: 6px;
+                border-radius: 2px;
+                color: {colors.get('text', '#cccccc')};
+                background-color: transparent;
+            }}
+            
+            QListWidget::item:selected {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                color: {colors.get('highlighted_text', '#ffffff')};
+            }}
+            
+            QListWidget::item:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+            }}
+            
+            QLineEdit {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QLineEdit:hover {{
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QLineEdit:focus {{
+                border-color: {colors.get('highlight', '#0078d4')};
+                border-width: 2px;
+            }}
+            
+            QComboBox {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QComboBox:hover {{
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QComboBox:focus {{
+                border-color: {colors.get('highlight', '#0078d4')};
+                border-width: 2px;
+            }}
+            
+            QComboBox::drop-down {{
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: 2px;
+                width: 20px;
+                background-color: {colors.get('button', '#3c3c3c')};
+            }}
+            
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid {colors.get('text', '#cccccc')};
+                margin-right: 6px;
+            }}
+            
+            QComboBox QAbstractItemView {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                selection-background-color: {colors.get('highlight', '#0078d4')};
+                selection-color: {colors.get('highlighted_text', '#ffffff')};
+                outline: none;
+            }}
+            
+            QComboBox QAbstractItemView::item {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                padding: 8px;
+            }}
+            
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+                color: {colors.get('text', '#cccccc')};
+            }}
+            
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                color: {colors.get('highlighted_text', '#ffffff')};
+            }}
+            
+            QGroupBox {{
+                color: {colors.get('text', '#cccccc')};
+                font-weight: bold;
+                border: 2px solid {colors.get('mid', '#2d2d30')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }}
+            
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: {colors.get('text', '#cccccc')};
+                background-color: {colors.get('window', '#1e1e1e')};
+            }}
+            
+            QTableWidget {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                gridline-color: {colors.get('mid', '#2d2d30')};
+                alternate-background-color: {colors.get('alternate_base', '#252526')};
+            }}
+            
+            QTableWidget::item {{
+                padding: 8px;
+                border-bottom: 1px solid {colors.get('mid', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+            }}
+            
+            QTableWidget::item:selected {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                color: {colors.get('highlighted_text', '#ffffff')};
+            }}
+            
+            QHeaderView::section {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                color: {colors.get('text', '#cccccc')};
+                padding: 8px;
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                font-weight: bold;
+            }}
+            
+            QScrollBar:vertical {{
+                background-color: {colors.get('base', '#2d2d30')};
+                width: 12px;
+                border-radius: 6px;
+            }}
+            
+            QScrollBar::handle:vertical {{
+                background-color: {colors.get('mid', '#2d2d30')};
+                border-radius: 6px;
+                min-height: 20px;
+            }}
+            
+            QScrollBar::handle:vertical:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+            }}
+            
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            
+            QMainWindow {{
+                background-color: {colors.get('window', '#1e1e1e')};
+                color: {colors.get('text', '#cccccc')};
+            }}
+            
+            QTabWidget {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+            }}
+            
+            QCheckBox {{
+                color: {colors.get('text', '#cccccc')};
+                spacing: 8px;
+            }}
+            
+            QCheckBox::indicator {{
+                width: 16px;
+                height: 16px;
+                border: 2px solid {colors.get('mid', '#2d2d30')};
+                border-radius: 3px;
+                background-color: {colors.get('base', '#2d2d30')};
+            }}
+            
+            QCheckBox::indicator:checked {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QCheckBox::indicator:checked {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QRadioButton {{
+                color: {colors.get('text', '#cccccc')};
+                spacing: 8px;
+            }}
+            
+            QRadioButton::indicator {{
+                width: 16px;
+                height: 16px;
+                border: 2px solid {colors.get('mid', '#2d2d30')};
+                border-radius: 8px;
+                background-color: {colors.get('base', '#2d2d30')};
+            }}
+            
+            QRadioButton::indicator:checked {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QRadioButton::indicator:checked {{
+                background-color: {colors.get('highlight', '#0078d4')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QSpinBox {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 2px solid {colors.get('mid', '#2d2d30')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QSpinBox:focus {{
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QSpinBox::up-button, QSpinBox::down-button {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                border-radius: 2px;
+                width: 16px;
+            }}
+            
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+            }}
+            
+            QSpinBox::up-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 4px solid {colors.get('text', '#cccccc')};
+            }}
+            
+            QSpinBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 4px solid {colors.get('text', '#cccccc')};
+            }}
+            
+            QDateEdit {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QDateEdit:hover {{
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QDateEdit:focus {{
+                border-color: {colors.get('highlight', '#0078d4')};
+                border-width: 2px;
+            }}
+            
+            QDateEdit::drop-down {{
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: 2px;
+                width: 20px;
+                background-color: {colors.get('button', '#3c3c3c')};
+            }}
+            
+            QDateEdit::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid {colors.get('text', '#cccccc')};
+                margin-right: 6px;
+            }}
+            
+            QSpinBox {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QSpinBox:hover {{
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QSpinBox:focus {{
+                border-color: {colors.get('highlight', '#0078d4')};
+                border-width: 2px;
+            }}
+            
+            QSpinBox::up-button {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: 2px;
+                width: 16px;
+                height: 12px;
+            }}
+            
+            QSpinBox::up-button:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QSpinBox::up-button:pressed {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+            }}
+            
+            QSpinBox::up-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 6px solid {colors.get('text', '#cccccc')};
+                margin-top: 2px;
+            }}
+            
+            QSpinBox::down-button {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: 2px;
+                width: 16px;
+                height: 12px;
+            }}
+            
+            QSpinBox::down-button:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QSpinBox::down-button:pressed {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+            }}
+            
+            QSpinBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid {colors.get('text', '#cccccc')};
+                margin-top: 2px;
+            }}
+            
+            QToolButton {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('padding', 8)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QToolButton:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QToolButton:pressed {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+            }}
+            
+            QToolButton:disabled {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+                color: {colors.get('mid', '#2d2d30')};
+                border-color: {colors.get('dark', '#1e1e1e')};
+            }}
+            
+            QPushButton[class="danger-button"] {{
+                background-color: #e81123;
+                color: white;
+                border: 1px solid #e81123;
+                font-weight: normal;
+                outline: none;
+                margin: 1px;
+                min-height: 20px;
+            }}
+            
+            QPushButton[class="danger-button"]:hover {{
+                background-color: #f1707a;
+                border-color: #f1707a;
+            }}
+            
+            QPushButton[class="danger-button"]:pressed {{
+                background-color: #c50e1f;
+                border-color: #c50e1f;
+            }}
+            
+            QPushButton[class="danger-button"]:disabled {{
+                background-color: #666666;
+                color: #999999;
+                border-color: #666666;
+            }}
+            """
+
+            app.setStyleSheet(stylesheet)
+
+        except Exception as e:
+            print(f"Error applying custom stylesheet: {e}")
 
     def refresh_data(self):
         """Refresh all data displays."""
