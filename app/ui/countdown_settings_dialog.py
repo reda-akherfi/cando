@@ -49,14 +49,14 @@ class CountdownSettingsDialog(QDialog):
         # Minutes
         settings_layout.addWidget(QLabel("Minutes:"), 0, 0)
         self.minutes_spin = QSpinBox()
-        self.minutes_spin.setRange(0, 480)  # 0-8 hours
+        self.minutes_spin.setRange(0, 100000)
         self.minutes_spin.setValue(self.minutes)
         settings_layout.addWidget(self.minutes_spin, 0, 1)
 
         # Seconds
         settings_layout.addWidget(QLabel("Seconds:"), 1, 0)
         self.seconds_spin = QSpinBox()
-        self.seconds_spin.setRange(0, 59)
+        self.seconds_spin.setRange(0, 100000)
         self.seconds_spin.setValue(self.seconds)
         settings_layout.addWidget(self.seconds_spin, 1, 1)
 

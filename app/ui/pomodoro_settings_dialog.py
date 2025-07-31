@@ -63,21 +63,21 @@ class PomodoroSettingsDialog(QDialog):
         # Work duration
         durations_layout.addWidget(QLabel("Work Duration:"), 0, 0)
         self.work_duration_spin = QSpinBox()
-        self.work_duration_spin.setRange(1, 120)
+        self.work_duration_spin.setRange(1, 100000)
         self.work_duration_spin.setValue(self.work_duration)
         durations_layout.addWidget(self.work_duration_spin, 0, 1)
 
         # Short break duration
         durations_layout.addWidget(QLabel("Short Break:"), 1, 0)
         self.short_break_spin = QSpinBox()
-        self.short_break_spin.setRange(1, 30)
+        self.short_break_spin.setRange(1, 100000)
         self.short_break_spin.setValue(self.short_break_duration)
         durations_layout.addWidget(self.short_break_spin, 1, 1)
 
         # Long break duration
         durations_layout.addWidget(QLabel("Long Break:"), 2, 0)
         self.long_break_spin = QSpinBox()
-        self.long_break_spin.setRange(5, 60)
+        self.long_break_spin.setRange(1, 100000)
         self.long_break_spin.setValue(self.long_break_duration)
         durations_layout.addWidget(self.long_break_spin, 2, 1)
 
