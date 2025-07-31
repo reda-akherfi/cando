@@ -52,6 +52,10 @@ class TimerController:
         Returns:
             The created timer object
         """
+        print(
+            f"TimerController.start_timer called with: timer_type={timer_type}, duration={duration}, pomodoro_session_type={pomodoro_session_type}"
+        )
+
         # Stop any currently active timer
         if self.active_timer_id:
             self.stop_timer()
@@ -102,6 +106,10 @@ class TimerController:
         Returns:
             The created timer object
         """
+        print(
+            f"TimerController.start_pomodoro_session called with: session_type={session_type}, work_duration={work_duration}, short_break_duration={short_break_duration}, long_break_duration={long_break_duration}"
+        )
+
         # Determine session duration and number
         if session_type == "work":
             duration = work_duration * 60  # Convert to seconds
@@ -115,6 +123,10 @@ class TimerController:
             session_number = self.pomodoro_session_count
         else:
             raise ValueError(f"Invalid session type: {session_type}")
+
+        print(
+            f"Calculated duration: {duration} seconds for session type: {session_type}"
+        )
 
         return self.start_timer(
             task_id=task_id,

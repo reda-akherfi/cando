@@ -21,13 +21,17 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QRadioButton,
     QButtonGroup,
+    QToolButton,
+    QDialog,
 )
 from PySide6.QtCore import QTimer, Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon
 from app.models.timer import Timer
 from app.models.task import Task
 from app.controllers.timer_controller import TimerController
 from app.services.database import DatabaseService
+from app.ui.countdown_settings_dialog import CountdownSettingsDialog
+from app.ui.pomodoro_settings_dialog import PomodoroSettingsDialog
 
 
 class TimerWidget(QWidget):
@@ -64,10 +68,18 @@ class TimerWidget(QWidget):
         self.autostart_breaks = True
         self.autostart_work = True
 
+        # Countdown settings
+        self.countdown_minutes = 30
+        self.countdown_seconds = 0
+
         self.setup_ui()
         self.refresh_projects()
         self.update_display()
         self.update_start_button_state()  # Set initial button state
+
+        # Print initial settings for debugging
+        print("=== Initial Timer Widget Settings ===")
+        self.print_current_settings()
 
     def setup_ui(self):
         """Set up the timer user interface."""
@@ -116,73 +128,42 @@ class TimerWidget(QWidget):
         self.mode_button_group.addButton(self.pomodoro_radio)
         mode_layout.addWidget(self.pomodoro_radio)
 
+        # Add spacer to push settings button to the right
+        mode_layout.addStretch()
+
+        # Settings button (cog wheel)
+        self.settings_button = QToolButton()
+        self.settings_button.setText("⚙")  # Unicode cog wheel as text
+        self.settings_button.setToolTip("Timer Settings")
+        self.settings_button.setEnabled(False)  # Disabled by default (stopwatch mode)
+        self.settings_button.clicked.connect(self.open_settings_dialog)
+        # Set a minimum size to ensure the button is visible
+        self.settings_button.setMinimumSize(30, 30)
+        # Style the button to make it look more like a settings button
+        self.settings_button.setStyleSheet(
+            """
+            QToolButton {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: #f8f8f8;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QToolButton:hover {
+                background-color: #e0e0e0;
+            }
+            QToolButton:disabled {
+                background-color: #f0f0f0;
+                color: #999;
+            }
+        """
+        )
+        mode_layout.addWidget(self.settings_button)
+
         # Connect the button group to the mode change handler
         self.mode_button_group.buttonClicked.connect(self.on_mode_changed)
 
         layout.addWidget(mode_group)
-
-        # Countdown settings
-        self.countdown_group = QGroupBox("Countdown Settings")
-        countdown_layout = QGridLayout(self.countdown_group)
-        countdown_layout.addWidget(QLabel("Minutes:"), 0, 0)
-        self.minutes_spin = QSpinBox()
-        self.minutes_spin.setRange(1, 480)
-        self.minutes_spin.setValue(25)
-        countdown_layout.addWidget(self.minutes_spin, 0, 1)
-        countdown_layout.addWidget(QLabel("Seconds:"), 1, 0)
-        self.seconds_spin = QSpinBox()
-        self.seconds_spin.setRange(0, 59)
-        self.seconds_spin.setValue(0)
-        countdown_layout.addWidget(self.seconds_spin, 1, 1)
-        layout.addWidget(self.countdown_group)
-        self.countdown_group.setVisible(False)
-
-        # Pomodoro settings
-        self.pomodoro_group = QGroupBox("Pomodoro Settings")
-        pomodoro_layout = QGridLayout(self.pomodoro_group)
-
-        # Work duration
-        pomodoro_layout.addWidget(QLabel("Work Duration (min):"), 0, 0)
-        self.work_duration_spin = QSpinBox()
-        self.work_duration_spin.setRange(1, 120)
-        self.work_duration_spin.setValue(self.work_duration)
-        self.work_duration_spin.valueChanged.connect(self.on_work_duration_changed)
-        pomodoro_layout.addWidget(self.work_duration_spin, 0, 1)
-
-        # Short break duration
-        pomodoro_layout.addWidget(QLabel("Short Break (min):"), 1, 0)
-        self.short_break_spin = QSpinBox()
-        self.short_break_spin.setRange(1, 30)
-        self.short_break_spin.setValue(self.short_break_duration)
-        self.short_break_spin.valueChanged.connect(self.on_short_break_changed)
-        pomodoro_layout.addWidget(self.short_break_spin, 1, 1)
-
-        # Long break duration
-        pomodoro_layout.addWidget(QLabel("Long Break (min):"), 2, 0)
-        self.long_break_spin = QSpinBox()
-        self.long_break_spin.setRange(5, 60)
-        self.long_break_spin.setValue(self.long_break_duration)
-        self.long_break_spin.valueChanged.connect(self.on_long_break_changed)
-        pomodoro_layout.addWidget(self.long_break_spin, 2, 1)
-
-        # Autostart options
-        pomodoro_layout.addWidget(QLabel("Autostart Options:"), 3, 0)
-        autostart_layout = QVBoxLayout()
-
-        self.autostart_breaks_checkbox = QCheckBox("Auto-start breaks")
-        self.autostart_breaks_checkbox.setChecked(self.autostart_breaks)
-        self.autostart_breaks_checkbox.toggled.connect(self.on_autostart_breaks_changed)
-        autostart_layout.addWidget(self.autostart_breaks_checkbox)
-
-        self.autostart_work_checkbox = QCheckBox("Auto-start work sessions")
-        self.autostart_work_checkbox.setChecked(self.autostart_work)
-        self.autostart_work_checkbox.toggled.connect(self.on_autostart_work_changed)
-        autostart_layout.addWidget(self.autostart_work_checkbox)
-
-        pomodoro_layout.addLayout(autostart_layout, 3, 1)
-
-        layout.addWidget(self.pomodoro_group)
-        self.pomodoro_group.setVisible(False)
 
         # Timer display
         display_group = QGroupBox("Timer")
@@ -311,39 +292,90 @@ class TimerWidget(QWidget):
     def on_mode_changed(self, button):
         """Handle timer mode changes."""
         mode = button.text().lower()
-        self.countdown_group.setVisible(mode == "countdown")
-        self.pomodoro_group.setVisible(mode == "pomodoro")
+
+        # Enable/disable settings button based on mode
+        self.settings_button.setEnabled(mode in ["countdown", "pomodoro"])
+
+        # Show/hide progress bar based on mode
         self.progress_bar.setVisible(mode in ["countdown", "pomodoro"])
 
-        if mode == "pomodoro":
-            # Set default Pomodoro duration
-            self.minutes_spin.setValue(self.work_duration)
-            self.seconds_spin.setValue(0)
-        elif mode == "countdown":
-            self.minutes_spin.setValue(30)
-            self.seconds_spin.setValue(0)
+    def open_settings_dialog(self):
+        """Open the appropriate settings dialog based on current mode."""
+        mode = self.get_current_mode()
 
-    def on_work_duration_changed(self, value: int):
-        """Handle work duration change."""
-        self.work_duration = value
-        if self.get_current_mode() == "pomodoro":
-            self.minutes_spin.setValue(value)
+        if mode == "countdown":
+            print(
+                "Opening countdown dialog with values:",
+                self.countdown_minutes,
+                self.countdown_seconds,
+            )
+            dialog = CountdownSettingsDialog(
+                minutes=self.countdown_minutes,
+                seconds=self.countdown_seconds,
+                parent=self,
+            )
+            if dialog.exec() == QDialog.Accepted:
+                settings = dialog.get_settings()
+                self.countdown_minutes = settings["minutes"]
+                self.countdown_seconds = settings["seconds"]
+                print(
+                    "Countdown settings now:",
+                    self.countdown_minutes,
+                    self.countdown_seconds,
+                )
+                self.apply_settings_to_ui()
+                self.print_current_settings()
 
-    def on_short_break_changed(self, value: int):
-        """Handle short break duration change."""
-        self.short_break_duration = value
+        elif mode == "pomodoro":
+            print(
+                "Opening pomodoro dialog with values:",
+                self.work_duration,
+                self.short_break_duration,
+                self.long_break_duration,
+                self.autostart_breaks,
+                self.autostart_work,
+            )
+            dialog = PomodoroSettingsDialog(
+                work_duration=self.work_duration,
+                short_break_duration=self.short_break_duration,
+                long_break_duration=self.long_break_duration,
+                autostart_breaks=self.autostart_breaks,
+                autostart_work=self.autostart_work,
+                parent=self,
+            )
+            if dialog.exec() == QDialog.Accepted:
+                settings = dialog.get_settings()
+                self.work_duration = settings["work_duration"]
+                self.short_break_duration = settings["short_break_duration"]
+                self.long_break_duration = settings["long_break_duration"]
+                self.autostart_breaks = settings["autostart_breaks"]
+                self.autostart_work = settings["autostart_work"]
+                print(
+                    "Pomodoro settings now:",
+                    self.work_duration,
+                    self.short_break_duration,
+                    self.long_break_duration,
+                    self.autostart_breaks,
+                    self.autostart_work,
+                )
+                self.apply_settings_to_ui()
+                self.print_current_settings()
 
-    def on_long_break_changed(self, value: int):
-        """Handle long break duration change."""
-        self.long_break_duration = value
+    def apply_settings_to_ui(self):
+        """Update any UI elements if needed after settings change."""
+        # For now, nothing to update, but this is a placeholder for future UI sync.
+        pass
 
-    def on_autostart_breaks_changed(self, checked: bool):
-        """Handle autostart breaks setting change."""
-        self.autostart_breaks = checked
-
-    def on_autostart_work_changed(self, checked: bool):
-        """Handle autostart work setting change."""
-        self.autostart_work = checked
+    def print_current_settings(self):
+        """Print current settings for debugging."""
+        print("=== Current Settings ===")
+        print(f"Countdown: {self.countdown_minutes}m {self.countdown_seconds}s")
+        print(f"Pomodoro Work: {self.work_duration}m")
+        print(f"Pomodoro Short Break: {self.short_break_duration}m")
+        print(f"Pomodoro Long Break: {self.long_break_duration}m")
+        print(f"Autostart Breaks: {self.autostart_breaks}")
+        print(f"Autostart Work: {self.autostart_work}")
+        print("=======================")
 
     def get_current_mode(self):
         """Get the currently selected timer mode from radio buttons."""
@@ -389,6 +421,12 @@ class TimerWidget(QWidget):
         mode = self.get_current_mode()
 
         if mode == "pomodoro":
+            print(
+                "Starting pomodoro with values:",
+                self.work_duration,
+                self.short_break_duration,
+                self.long_break_duration,
+            )
             # Start a Pomodoro work session
             timer = self.timer_controller.start_pomodoro_session(
                 self.current_task.id,
@@ -398,7 +436,13 @@ class TimerWidget(QWidget):
                 long_break_duration=self.long_break_duration,
             )
         elif mode == "countdown":
-            duration = self.minutes_spin.value() * 60 + self.seconds_spin.value()
+            print(
+                "Starting countdown with values:",
+                self.countdown_minutes,
+                self.countdown_seconds,
+            )
+            duration = self.countdown_minutes * 60 + self.countdown_seconds
+            print(f"Calculated countdown duration: {duration} seconds")
             if duration <= 0:
                 if self.notification_manager:
                     self.notification_manager.show_error(
@@ -425,6 +469,7 @@ class TimerWidget(QWidget):
                 self.status_label.setText(f"Running: {self.current_task.name}")
 
             self.timer_started.emit(timer)
+            print("Timer started successfully with mode:", mode)
 
     def stop_timer(self):
         """Stop the timer."""
@@ -579,6 +624,12 @@ class TimerWidget(QWidget):
                 )
             return
 
+        print(
+            "Starting work session with values:",
+            self.work_duration,
+            self.short_break_duration,
+            self.long_break_duration,
+        )
         timer = self.timer_controller.start_pomodoro_session(
             self.current_task.id,
             "work",
@@ -605,6 +656,12 @@ class TimerWidget(QWidget):
                 )
             return
 
+        print(
+            "Starting break session with values:",
+            self.work_duration,
+            self.short_break_duration,
+            self.long_break_duration,
+        )
         timer = self.timer_controller.start_pomodoro_session(
             self.current_task.id,
             break_type,
