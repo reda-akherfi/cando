@@ -26,6 +26,9 @@ class PomodoroSettingsDialog(QDialog):
         long_break_duration: int = 15,
         autostart_breaks: bool = True,
         autostart_work: bool = True,
+        work_count_down: bool = True,
+        short_break_count_down: bool = True,
+        long_break_count_down: bool = True,
         parent=None,
     ):
         super().__init__(parent)
@@ -34,8 +37,11 @@ class PomodoroSettingsDialog(QDialog):
         self.long_break_duration = long_break_duration
         self.autostart_breaks = autostart_breaks
         self.autostart_work = autostart_work
+        self.work_count_down = work_count_down
+        self.short_break_count_down = short_break_count_down
+        self.long_break_count_down = long_break_count_down
         print(
-            f"PomodoroSettingsDialog initialized with: work={work_duration}m, short={short_break_duration}m, long={long_break_duration}m, autostart_breaks={autostart_breaks}, autostart_work={autostart_work}"
+            f"PomodoroSettingsDialog initialized with: work={work_duration}m, short={short_break_duration}m, long={long_break_duration}m, autostart_breaks={autostart_breaks}, autostart_work={autostart_work}, work_count_down={work_count_down}, short_break_count_down={short_break_count_down}, long_break_count_down={long_break_count_down}"
         )
         self.setup_ui()
         self.setup_behavior()
@@ -44,7 +50,7 @@ class PomodoroSettingsDialog(QDialog):
         """Set up the user interface."""
         self.setWindowTitle("Pomodoro Settings")
         self.setModal(True)
-        self.setFixedSize(350, 280)
+        self.setFixedSize(350, 350)
 
         # Center the dialog on the parent
         if self.parent():
@@ -97,6 +103,33 @@ class PomodoroSettingsDialog(QDialog):
 
         layout.addWidget(autostart_group)
 
+        # Count direction group
+        direction_group = QGroupBox("Count Direction")
+        direction_layout = QVBoxLayout(direction_group)
+
+        self.work_count_down_checkbox = QCheckBox("Work sessions count down")
+        self.work_count_down_checkbox.setChecked(self.work_count_down)
+        self.work_count_down_checkbox.setToolTip(
+            "When checked, work sessions count down from target. When unchecked, they count up from zero."
+        )
+        direction_layout.addWidget(self.work_count_down_checkbox)
+
+        self.short_break_count_down_checkbox = QCheckBox("Short breaks count down")
+        self.short_break_count_down_checkbox.setChecked(self.short_break_count_down)
+        self.short_break_count_down_checkbox.setToolTip(
+            "When checked, short breaks count down from target. When unchecked, they count up from zero."
+        )
+        direction_layout.addWidget(self.short_break_count_down_checkbox)
+
+        self.long_break_count_down_checkbox = QCheckBox("Long breaks count down")
+        self.long_break_count_down_checkbox.setChecked(self.long_break_count_down)
+        self.long_break_count_down_checkbox.setToolTip(
+            "When checked, long breaks count down from target. When unchecked, they count up from zero."
+        )
+        direction_layout.addWidget(self.long_break_count_down_checkbox)
+
+        layout.addWidget(direction_group)
+
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -125,6 +158,9 @@ class PomodoroSettingsDialog(QDialog):
             "long_break_duration": self.long_break_spin.value(),
             "autostart_breaks": self.autostart_breaks_checkbox.isChecked(),
             "autostart_work": self.autostart_work_checkbox.isChecked(),
+            "work_count_down": self.work_count_down_checkbox.isChecked(),
+            "short_break_count_down": self.short_break_count_down_checkbox.isChecked(),
+            "long_break_count_down": self.long_break_count_down_checkbox.isChecked(),
         }
         print(f"PomodoroSettingsDialog.get_settings() returning: {settings}")
         return settings
@@ -136,6 +172,9 @@ class PomodoroSettingsDialog(QDialog):
         long_break_duration: int,
         autostart_breaks: bool,
         autostart_work: bool,
+        work_count_down: bool,
+        short_break_count_down: bool,
+        long_break_count_down: bool,
     ):
         """Set the current settings."""
         self.work_duration_spin.setValue(work_duration)
@@ -143,3 +182,6 @@ class PomodoroSettingsDialog(QDialog):
         self.long_break_spin.setValue(long_break_duration)
         self.autostart_breaks_checkbox.setChecked(autostart_breaks)
         self.autostart_work_checkbox.setChecked(autostart_work)
+        self.work_count_down_checkbox.setChecked(work_count_down)
+        self.short_break_count_down_checkbox.setChecked(short_break_count_down)
+        self.long_break_count_down_checkbox.setChecked(long_break_count_down)

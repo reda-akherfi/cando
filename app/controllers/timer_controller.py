@@ -38,6 +38,7 @@ class TimerController:
         duration: int = None,
         pomodoro_session_type: str = None,
         pomodoro_session_number: int = None,
+        count_down: bool = True,
     ) -> Timer:
         """
         Start a new timer for a task.
@@ -53,7 +54,7 @@ class TimerController:
             The created timer object
         """
         print(
-            f"TimerController.start_timer called with: timer_type={timer_type}, duration={duration}, pomodoro_session_type={pomodoro_session_type}"
+            f"TimerController.start_timer called with: timer_type={timer_type}, duration={duration}, pomodoro_session_type={pomodoro_session_type}, count_down={count_down}"
         )
 
         # Stop any currently active timer
@@ -92,6 +93,9 @@ class TimerController:
         work_duration: int = 25,
         short_break_duration: int = 5,
         long_break_duration: int = 15,
+        work_count_down: bool = True,
+        short_break_count_down: bool = True,
+        long_break_count_down: bool = True,
     ) -> Timer:
         """
         Start a Pomodoro session with proper session tracking.
@@ -107,25 +111,28 @@ class TimerController:
             The created timer object
         """
         print(
-            f"TimerController.start_pomodoro_session called with: session_type={session_type}, work_duration={work_duration}, short_break_duration={short_break_duration}, long_break_duration={long_break_duration}"
+            f"TimerController.start_pomodoro_session called with: session_type={session_type}, work_duration={work_duration}, short_break_duration={short_break_duration}, long_break_duration={long_break_duration}, work_count_down={work_count_down}, short_break_count_down={short_break_count_down}, long_break_count_down={long_break_count_down}"
         )
 
-        # Determine session duration and number
+        # Determine session duration, number, and count direction
         if session_type == "work":
             duration = work_duration * 60  # Convert to seconds
             self.pomodoro_session_count += 1
             session_number = self.pomodoro_session_count
+            count_down = work_count_down
         elif session_type == "short_break":
             duration = short_break_duration * 60  # Convert to seconds
             session_number = self.pomodoro_session_count
+            count_down = short_break_count_down
         elif session_type == "long_break":
             duration = long_break_duration * 60  # Convert to seconds
             session_number = self.pomodoro_session_count
+            count_down = long_break_count_down
         else:
             raise ValueError(f"Invalid session type: {session_type}")
 
         print(
-            f"Calculated duration: {duration} seconds for session type: {session_type}"
+            f"Calculated duration: {duration} seconds for session type: {session_type}, count_down: {count_down}"
         )
 
         return self.start_timer(
@@ -134,6 +141,7 @@ class TimerController:
             duration=duration,
             pomodoro_session_type=session_type,
             pomodoro_session_number=session_number,
+            count_down=count_down,
         )
 
     def get_next_pomodoro_session_type(self) -> str:

@@ -1055,6 +1055,10 @@ class DatabaseService:
             self.set_config(
                 "timer_countdown_seconds", str(settings.get("countdown_seconds", 0))
             )
+            self.set_config(
+                "timer_countdown_count_down",
+                str(settings.get("countdown_count_down", True)),
+            )
 
             # Save pomodoro settings
             self.set_config(
@@ -1074,6 +1078,17 @@ class DatabaseService:
             self.set_config(
                 "timer_autostart_work", str(settings.get("autostart_work", True))
             )
+            self.set_config(
+                "timer_work_count_down", str(settings.get("work_count_down", True))
+            )
+            self.set_config(
+                "timer_short_break_count_down",
+                str(settings.get("short_break_count_down", True)),
+            )
+            self.set_config(
+                "timer_long_break_count_down",
+                str(settings.get("long_break_count_down", True)),
+            )
 
             return True
         except Exception as e:
@@ -1090,6 +1105,10 @@ class DatabaseService:
                 "countdown_seconds": int(
                     self.get_config("timer_countdown_seconds", "0")
                 ),
+                "countdown_count_down": self.get_config(
+                    "timer_countdown_count_down", "True"
+                ).lower()
+                == "true",
                 "work_duration": int(self.get_config("timer_work_duration", "25")),
                 "short_break_duration": int(
                     self.get_config("timer_short_break_duration", "5")
@@ -1105,6 +1124,18 @@ class DatabaseService:
                     "timer_autostart_work", "True"
                 ).lower()
                 == "true",
+                "work_count_down": self.get_config(
+                    "timer_work_count_down", "True"
+                ).lower()
+                == "true",
+                "short_break_count_down": self.get_config(
+                    "timer_short_break_count_down", "True"
+                ).lower()
+                == "true",
+                "long_break_count_down": self.get_config(
+                    "timer_long_break_count_down", "True"
+                ).lower()
+                == "true",
             }
         except Exception as e:
             print(f"Error loading timer settings: {e}")
@@ -1112,9 +1143,13 @@ class DatabaseService:
             return {
                 "countdown_minutes": 30,
                 "countdown_seconds": 0,
+                "countdown_count_down": True,
                 "work_duration": 25,
                 "short_break_duration": 5,
                 "long_break_duration": 15,
                 "autostart_breaks": True,
                 "autostart_work": True,
+                "work_count_down": True,
+                "short_break_count_down": True,
+                "long_break_count_down": True,
             }

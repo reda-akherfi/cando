@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QGroupBox,
     QGridLayout,
+    QCheckBox,
 )
 from PySide6.QtCore import Qt
 
@@ -18,11 +19,16 @@ from PySide6.QtCore import Qt
 class CountdownSettingsDialog(QDialog):
     """Dialog for configuring countdown timer settings."""
 
-    def __init__(self, minutes: int = 30, seconds: int = 0, parent=None):
+    def __init__(
+        self, minutes: int = 30, seconds: int = 0, count_down: bool = True, parent=None
+    ):
         super().__init__(parent)
         self.minutes = minutes
         self.seconds = seconds
-        print(f"CountdownSettingsDialog initialized with: {minutes}m {seconds}s")
+        self.count_down = count_down
+        print(
+            f"CountdownSettingsDialog initialized with: {minutes}m {seconds}s, count_down={count_down}"
+        )
         self.setup_ui()
         self.setup_behavior()
 
@@ -30,7 +36,7 @@ class CountdownSettingsDialog(QDialog):
         """Set up the user interface."""
         self.setWindowTitle("Countdown Settings")
         self.setModal(True)
-        self.setFixedSize(300, 150)
+        self.setFixedSize(300, 200)
 
         # Center the dialog on the parent
         if self.parent():
@@ -62,6 +68,19 @@ class CountdownSettingsDialog(QDialog):
 
         layout.addWidget(settings_group)
 
+        # Count direction group
+        direction_group = QGroupBox("Count Direction")
+        direction_layout = QVBoxLayout(direction_group)
+
+        self.count_down_checkbox = QCheckBox("Count Down")
+        self.count_down_checkbox.setChecked(self.count_down)
+        self.count_down_checkbox.setToolTip(
+            "When checked, timer counts down from target. When unchecked, timer counts up from zero."
+        )
+        direction_layout.addWidget(self.count_down_checkbox)
+
+        layout.addWidget(direction_group)
+
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -87,11 +106,13 @@ class CountdownSettingsDialog(QDialog):
         settings = {
             "minutes": self.minutes_spin.value(),
             "seconds": self.seconds_spin.value(),
+            "count_down": self.count_down_checkbox.isChecked(),
         }
         print(f"CountdownSettingsDialog.get_settings() returning: {settings}")
         return settings
 
-    def set_settings(self, minutes: int, seconds: int):
+    def set_settings(self, minutes: int, seconds: int, count_down: bool):
         """Set the current settings."""
         self.minutes_spin.setValue(minutes)
         self.seconds_spin.setValue(seconds)
+        self.count_down_checkbox.setChecked(count_down)
