@@ -79,6 +79,7 @@ class TimerController:
         )
 
         self.active_timer_id = db_timer.id
+        self._clear_active_timer_cache()  # Clear cache when starting new timer
 
         # Convert to dataclass for return
         return Timer(
@@ -195,6 +196,9 @@ class TimerController:
             duration=effective_duration,
         )
 
+        # Update cached timer to avoid database queries
+        self._update_cached_timer_end_time(actual_end_time)
+
         if db_timer:
             # Convert to dataclass for return
             finished_timer = Timer(
@@ -213,6 +217,7 @@ class TimerController:
             self.paused_timer = None
             self.pause_start_time = None
             self.total_pause_duration = 0.0
+            self._clear_active_timer_cache()  # Clear cache when stopping timer
             return finished_timer
 
         return None
@@ -388,6 +393,11 @@ class TimerController:
         # Ensure we don't return negative time
         return max(0.0, effective_elapsed)
 
+    def _update_cached_timer_end_time(self, end_time: datetime):
+        """Update the cached timer's end time to avoid database queries."""
+        if hasattr(self, "_cached_active_timer") and self._cached_active_timer:
+            self._cached_active_timer.end = end_time
+
     def get_active_timer(self) -> Optional[Timer]:
         """
         Get the currently active timer.
@@ -398,24 +408,36 @@ class TimerController:
         if not self.active_timer_id:
             return None
 
-        db_timer = self.db_service.get_timers()
-        active_timer = next((t for t in db_timer if t.id == self.active_timer_id), None)
-
-        if active_timer:
-            timer = Timer(
-                id=active_timer.id,
-                task_id=active_timer.task_id,
-                start=active_timer.start,
-                end=active_timer.end,
-                type=active_timer.type,
-                duration=active_timer.duration,
-                pomodoro_session_type=active_timer.pomodoro_session_type,
-                pomodoro_session_number=active_timer.pomodoro_session_number,
+        # Cache the active timer to avoid database queries on every update
+        if (
+            not hasattr(self, "_cached_active_timer")
+            or self._cached_active_timer is None
+        ):
+            db_timer = self.db_service.get_timers()
+            active_timer = next(
+                (t for t in db_timer if t.id == self.active_timer_id), None
             )
 
-            return timer
+            if active_timer:
+                self._cached_active_timer = Timer(
+                    id=active_timer.id,
+                    task_id=active_timer.task_id,
+                    start=active_timer.start,
+                    end=active_timer.end,
+                    type=active_timer.type,
+                    duration=active_timer.duration,
+                    pomodoro_session_type=active_timer.pomodoro_session_type,
+                    pomodoro_session_number=active_timer.pomodoro_session_number,
+                )
+            else:
+                self._cached_active_timer = None
 
-        return None
+        return self._cached_active_timer
+
+    def _clear_active_timer_cache(self):
+        """Clear the cached active timer."""
+        if hasattr(self, "_cached_active_timer"):
+            self._cached_active_timer = None
 
     def get_task_timers(self, task_id: int) -> list[Timer]:
         """

@@ -60,7 +60,10 @@ class TimerWidget(QWidget):
         self._sync_in_progress = False  # Flag to prevent recursive synchronization
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_display)
-        self.update_timer.start(1000)  # Update every second
+        self.update_timer.start(100)  # Update every 100ms for smoother display
+
+        # Track if we have an active timer to optimize updates
+        self._has_active_timer = False
 
         # Load timer settings from database
         settings = self.db_service.load_timer_settings()
@@ -661,23 +664,32 @@ class TimerWidget(QWidget):
         """Update the timer display."""
         active_timer = self.timer_controller.get_active_timer()
 
+        # Optimize timer updates - only update frequently when there's an active timer
+        has_active_timer = active_timer is not None
+        if has_active_timer != self._has_active_timer:
+            self._has_active_timer = has_active_timer
+            if has_active_timer:
+                self.update_timer.start(100)  # Fast updates when timer is running
+            else:
+                self.update_timer.start(1000)  # Slower updates when no timer
+
         if active_timer:
             # Check if timer is paused
             is_paused = self.timer_controller.is_timer_paused()
             mode = self.get_current_mode()
 
+            # Calculate elapsed time once to avoid multiple calculations
+            if is_paused:
+                elapsed_seconds = self.timer_controller.get_elapsed_at_pause()
+            else:
+                elapsed_seconds = self.timer_controller.get_effective_elapsed_time(
+                    active_timer
+                )
+
+            elapsed = timedelta(seconds=elapsed_seconds)
+
             if mode == "pomodoro" and active_timer.duration:
                 # Pomodoro mode - check count direction based on session type
-                if is_paused:
-                    # Use the elapsed time at the moment of pause
-                    elapsed_seconds = self.timer_controller.get_elapsed_at_pause()
-                    elapsed = timedelta(seconds=elapsed_seconds)
-                else:
-                    # Use effective elapsed time (accounting for pauses)
-                    elapsed_seconds = self.timer_controller.get_effective_elapsed_time(
-                        active_timer
-                    )
-                    elapsed = timedelta(seconds=elapsed_seconds)
                 session_type = active_timer.pomodoro_session_type
 
                 # Determine count direction based on session type
@@ -746,16 +758,6 @@ class TimerWidget(QWidget):
 
             else:
                 # Stopwatch or countdown mode
-                if is_paused:
-                    # Use the elapsed time at the moment of pause
-                    elapsed_seconds = self.timer_controller.get_elapsed_at_pause()
-                    elapsed = timedelta(seconds=elapsed_seconds)
-                else:
-                    # Use effective elapsed time (accounting for pauses)
-                    elapsed_seconds = self.timer_controller.get_effective_elapsed_time(
-                        active_timer
-                    )
-                    elapsed = timedelta(seconds=elapsed_seconds)
 
                 if mode == "countdown" and active_timer.duration:
                     # Countdown mode - check count direction
