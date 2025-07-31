@@ -41,11 +41,13 @@ class TimerWidget(QWidget):
         self,
         timer_controller: TimerController,
         db_service: DatabaseService,
+        notification_manager=None,
         parent=None,
     ):
         super().__init__(parent)
         self.timer_controller = timer_controller
         self.db_service = db_service
+        self.notification_manager = notification_manager
         self.current_task: Optional[Task] = None
         self.current_project_id: Optional[int] = None
         self._sync_in_progress = False  # Flag to prevent recursive synchronization
@@ -320,7 +322,14 @@ class TimerWidget(QWidget):
     def start_timer(self):
         """Start the timer."""
         if not self.current_task:
-            QMessageBox.warning(self, "No Task Selected", "Please select a task first.")
+            if self.notification_manager:
+                self.notification_manager.show_error(
+                    "No Task Selected", "Please select a task first."
+                )
+            else:
+                QMessageBox.warning(
+                    self, "No Task Selected", "Please select a task first."
+                )
             return
 
         mode = self.mode_combo.currentText().lower()
@@ -337,9 +346,14 @@ class TimerWidget(QWidget):
         elif mode == "countdown":
             duration = self.minutes_spin.value() * 60 + self.seconds_spin.value()
             if duration <= 0:
-                QMessageBox.warning(
-                    self, "Invalid Duration", "Please set a valid duration."
-                )
+                if self.notification_manager:
+                    self.notification_manager.show_error(
+                        "Invalid Duration", "Please set a valid duration."
+                    )
+                else:
+                    QMessageBox.warning(
+                        self, "Invalid Duration", "Please set a valid duration."
+                    )
                 return
             timer = self.timer_controller.start_timer(
                 self.current_task.id, mode, duration=duration
@@ -438,9 +452,14 @@ class TimerWidget(QWidget):
                         if elapsed.total_seconds() >= active_timer.duration:
                             self.stop_timer()
                             self.timer_completed.emit(active_timer)
-                            QMessageBox.information(
-                                self, "Timer Complete", "Your timer has finished!"
-                            )
+                            if self.notification_manager:
+                                self.notification_manager.show_success(
+                                    "Timer Complete", "Your timer has finished!"
+                                )
+                            else:
+                                QMessageBox.information(
+                                    self, "Timer Complete", "Your timer has finished!"
+                                )
         else:
             self.time_label.setText("00:00:00")
             self.progress_bar.setValue(0)
@@ -451,12 +470,18 @@ class TimerWidget(QWidget):
 
         if session_type == "work":
             # Work session completed
-            QMessageBox.information(
-                self,
-                "Work Session Complete!",
-                f"Great job! You've completed work session #{completed_timer.pomodoro_session_number}.\n\n"
-                "Time for a break!",
-            )
+            if self.notification_manager:
+                self.notification_manager.show_success(
+                    "Work Session Complete!",
+                    f"Great job! You've completed work session #{completed_timer.pomodoro_session_number}. Time for a break!",
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    "Work Session Complete!",
+                    f"Great job! You've completed work session #{completed_timer.pomodoro_session_number}.\n\n"
+                    "Time for a break!",
+                )
 
             if self.autostart_breaks:
                 # Auto-start break
@@ -471,11 +496,17 @@ class TimerWidget(QWidget):
         elif session_type in ["short_break", "long_break"]:
             # Break completed
             break_type = "Short" if session_type == "short_break" else "Long"
-            QMessageBox.information(
-                self,
-                f"{break_type} Break Complete!",
-                f"Break time is over. Ready to get back to work?",
-            )
+            if self.notification_manager:
+                self.notification_manager.show_success(
+                    f"{break_type} Break Complete!",
+                    "Break time is over. Ready to get back to work?",
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    f"{break_type} Break Complete!",
+                    f"Break time is over. Ready to get back to work?",
+                )
 
             if self.autostart_work:
                 # Auto-start next work session
@@ -484,7 +515,14 @@ class TimerWidget(QWidget):
     def start_work_session(self):
         """Start a new Pomodoro work session."""
         if not self.current_task:
-            QMessageBox.warning(self, "No Task Selected", "Please select a task first.")
+            if self.notification_manager:
+                self.notification_manager.show_error(
+                    "No Task Selected", "Please select a task first."
+                )
+            else:
+                QMessageBox.warning(
+                    self, "No Task Selected", "Please select a task first."
+                )
             return
 
         timer = self.timer_controller.start_pomodoro_session(
@@ -503,7 +541,14 @@ class TimerWidget(QWidget):
     def start_break_session(self, break_type: str):
         """Start a Pomodoro break session."""
         if not self.current_task:
-            QMessageBox.warning(self, "No Task Selected", "Please select a task first.")
+            if self.notification_manager:
+                self.notification_manager.show_error(
+                    "No Task Selected", "Please select a task first."
+                )
+            else:
+                QMessageBox.warning(
+                    self, "No Task Selected", "Please select a task first."
+                )
             return
 
         timer = self.timer_controller.start_pomodoro_session(

@@ -39,6 +39,7 @@ from app.ui.task_list_widget import TaskListWidget
 from app.ui.tag_dialog import TagDialog
 from app.ui.tag_list_widget import TagListWidget
 from app.ui.timer_widget import TimerWidget
+from app.ui.notification_widget import NotificationManager
 from app.ui.ui_main import UiMainWindow
 from app.models.project import Project
 from app.models.task import Task
@@ -80,6 +81,10 @@ class MainWindow(QMainWindow):
 
         self.ui = UiMainWindow()
         self.ui.setupUi(self)
+
+        # Initialize notification manager
+        self.notification_manager = NotificationManager(self)
+
         self.setup_tabs()
         self.refresh_data()
 
@@ -389,7 +394,9 @@ class MainWindow(QMainWindow):
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         # Create and add the comprehensive timer widget
-        self.timer_widget = TimerWidget(self.timer_controller, self.db_service)
+        self.timer_widget = TimerWidget(
+            self.timer_controller, self.db_service, self.notification_manager
+        )
         scroll_area.setWidget(self.timer_widget)
         layout.addWidget(scroll_area)
 
@@ -783,22 +790,18 @@ class MainWindow(QMainWindow):
             if tags:
                 task_count = len(self.db_service.get_tasks(project.id))
                 if task_count > 0:
-                    QMessageBox.information(
-                        self,
-                        "Success",
-                        f"Project '{project.name}' created successfully!\n\n"
-                        f"Tags have been automatically applied to all {task_count} tasks in this project.",
+                    self.notification_manager.show_success(
+                        "Project Created",
+                        f"Project '{project.name}' created successfully! Tags have been automatically applied to all {task_count} tasks in this project.",
                     )
                 else:
-                    QMessageBox.information(
-                        self,
-                        "Success",
-                        f"Project '{project.name}' created successfully!\n\n"
-                        "Tags will be automatically applied to any tasks you add to this project.",
+                    self.notification_manager.show_success(
+                        "Project Created",
+                        f"Project '{project.name}' created successfully! Tags will be automatically applied to any tasks you add to this project.",
                     )
             else:
-                QMessageBox.information(
-                    self, "Success", f"Project '{project.name}' created successfully!"
+                self.notification_manager.show_success(
+                    "Project Created", f"Project '{project.name}' created successfully!"
                 )
 
     def edit_project(self, project: Project):
@@ -810,8 +813,8 @@ class MainWindow(QMainWindow):
                 self.db_service.delete_project(project.id)
                 self.refresh_project_list()
                 self.populate_project_tag_filter()  # Update project tag filter
-                QMessageBox.information(
-                    self, "Success", f"Project '{project.name}' deleted successfully!"
+                self.notification_manager.show_success(
+                    "Project Deleted", f"Project '{project.name}' deleted successfully!"
                 )
             else:
                 # Project was updated
@@ -845,9 +848,8 @@ class MainWindow(QMainWindow):
                     )  # Refresh task list if this project is currently selected
                     self.populate_task_tag_filter(project.id)  # Update task tag filter
                 self.populate_project_tag_filter()  # Update project tag filter
-                QMessageBox.information(
-                    self,
-                    "Success",
+                self.notification_manager.show_success(
+                    "Project Updated",
                     f"Project '{updated_project.name}' updated successfully!",
                 )
 
@@ -865,8 +867,8 @@ class MainWindow(QMainWindow):
             self.db_service.delete_project(project.id)
             self.refresh_project_list()
             self.populate_project_tag_filter()  # Update project tag filter
-            QMessageBox.information(
-                self, "Success", f"Project '{project.name}' deleted successfully!"
+            self.notification_manager.show_success(
+                "Project Deleted", f"Project '{project.name}' deleted successfully!"
             )
 
     def on_timer_started(self, timer: Timer):
@@ -1006,15 +1008,13 @@ class MainWindow(QMainWindow):
 
             # Show cascading info if tags were added
             if tags:
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Task '{task.name}' created successfully!\n\n"
-                    "Tags have been automatically added to the project as well.",
+                self.notification_manager.show_success(
+                    "Task Created",
+                    f"Task '{task.name}' created successfully! Tags have been automatically added to the project as well.",
                 )
             else:
-                QMessageBox.information(
-                    self, "Success", f"Task '{task.name}' created successfully!"
+                self.notification_manager.show_success(
+                    "Task Created", f"Task '{task.name}' created successfully!"
                 )
 
     def edit_task(self, task: Task):
@@ -1025,8 +1025,8 @@ class MainWindow(QMainWindow):
                 # Task was deleted
                 self.db_service.delete_task(task.id)
                 self.refresh_task_list(self.current_project_id)
-                QMessageBox.information(
-                    self, "Success", f"Task '{task.name}' deleted successfully!"
+                self.notification_manager.show_success(
+                    "Task Deleted", f"Task '{task.name}' deleted successfully!"
                 )
             else:
                 # Task was updated
@@ -1056,10 +1056,8 @@ class MainWindow(QMainWindow):
                 )  # Update task tag filter
                 self.populate_project_tag_filter()  # Update project tag filter
 
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Task '{updated_task.name}' updated successfully!",
+                self.notification_manager.show_success(
+                    "Task Updated", f"Task '{updated_task.name}' updated successfully!"
                 )
 
     def delete_task(self, task: Task):
@@ -1081,8 +1079,8 @@ class MainWindow(QMainWindow):
                 self.current_project_id
             )  # Update task tag filter
             self.populate_project_tag_filter()  # Update project tag filter
-            QMessageBox.information(
-                self, "Success", f"Task '{task.name}' deleted successfully!"
+            self.notification_manager.show_success(
+                "Task Deleted", f"Task '{task.name}' deleted successfully!"
             )
 
     def on_task_selected(self, task: Task):
@@ -1191,15 +1189,13 @@ class MainWindow(QMainWindow):
                         self.refresh_task_list(self.current_project_id)
                         self.populate_task_tag_filter(self.current_project_id)
                     self.populate_project_tag_filter()
-                    QMessageBox.information(
-                        self,
-                        "Success",
+                    self.notification_manager.show_success(
+                        "Tag Updated",
                         f"Tag '{tag.name}' updated to '{tag_data['name']}'",
                     )
                 else:
-                    QMessageBox.warning(
-                        self,
-                        "Error",
+                    self.notification_manager.show_error(
+                        "Update Failed",
                         f"Tag '{tag_data['name']}' already exists or could not be updated.",
                     )
 
@@ -1213,12 +1209,12 @@ class MainWindow(QMainWindow):
                 self.refresh_task_list(self.current_project_id)
                 self.populate_task_tag_filter(self.current_project_id)
             self.populate_project_tag_filter()
-            QMessageBox.information(
-                self, "Success", f"Tag '{tag.name}' deleted successfully!"
+            self.notification_manager.show_success(
+                "Tag Deleted", f"Tag '{tag.name}' deleted successfully!"
             )
         else:
-            QMessageBox.warning(
-                self, "Error", f"Tag '{tag.name}' could not be deleted."
+            self.notification_manager.show_error(
+                "Delete Failed", f"Tag '{tag.name}' could not be deleted."
             )
 
     def add_tag(self):
@@ -1237,12 +1233,12 @@ class MainWindow(QMainWindow):
                         self.refresh_task_list(self.current_project_id)
                         self.populate_task_tag_filter(self.current_project_id)
                     self.populate_project_tag_filter()
-                    QMessageBox.information(
-                        self, "Success", f"Tag '{tag_data['name']}' added successfully!"
+                    self.notification_manager.show_success(
+                        "Tag Added", f"Tag '{tag_data['name']}' added successfully!"
                     )
                 else:
-                    QMessageBox.warning(
-                        self, "Error", f"Tag '{tag_data['name']}' already exists."
+                    self.notification_manager.show_error(
+                        "Add Failed", f"Tag '{tag_data['name']}' already exists."
                     )
 
     def populate_project_tag_filter(self):
