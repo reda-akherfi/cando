@@ -61,16 +61,19 @@ class TimerWidget(QWidget):
         self.update_timer.timeout.connect(self.update_display)
         self.update_timer.start(1000)  # Update every second
 
+        # Load timer settings from database
+        settings = self.db_service.load_timer_settings()
+
         # Pomodoro settings
-        self.work_duration = 25  # minutes
-        self.short_break_duration = 5  # minutes
-        self.long_break_duration = 15  # minutes
-        self.autostart_breaks = True
-        self.autostart_work = True
+        self.work_duration = settings["work_duration"]  # minutes
+        self.short_break_duration = settings["short_break_duration"]  # minutes
+        self.long_break_duration = settings["long_break_duration"]  # minutes
+        self.autostart_breaks = settings["autostart_breaks"]
+        self.autostart_work = settings["autostart_work"]
 
         # Countdown settings
-        self.countdown_minutes = 30
-        self.countdown_seconds = 0
+        self.countdown_minutes = settings["countdown_minutes"]
+        self.countdown_seconds = settings["countdown_seconds"]
 
         self.setup_ui()
         self.refresh_projects()
@@ -173,10 +176,6 @@ class TimerWidget(QWidget):
         self.time_label.setFont(QFont("Arial", 48, QFont.Bold))
         self.time_label.setStyleSheet("color: #4CAF50;")
         display_layout.addWidget(self.time_label)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        display_layout.addWidget(self.progress_bar)
 
         self.status_label = QLabel("Ready to start")
         self.status_label.setAlignment(Qt.AlignCenter)
@@ -296,9 +295,6 @@ class TimerWidget(QWidget):
         # Enable/disable settings button based on mode
         self.settings_button.setEnabled(mode in ["countdown", "pomodoro"])
 
-        # Show/hide progress bar based on mode
-        self.progress_bar.setVisible(mode in ["countdown", "pomodoro"])
-
     def open_settings_dialog(self):
         """Open the appropriate settings dialog based on current mode."""
         mode = self.get_current_mode()
@@ -363,8 +359,21 @@ class TimerWidget(QWidget):
 
     def apply_settings_to_ui(self):
         """Update any UI elements if needed after settings change."""
-        # For now, nothing to update, but this is a placeholder for future UI sync.
-        pass
+        # Save settings to database
+        self.save_settings_to_database()
+
+    def save_settings_to_database(self):
+        """Save current timer settings to the database."""
+        settings = {
+            "countdown_minutes": self.countdown_minutes,
+            "countdown_seconds": self.countdown_seconds,
+            "work_duration": self.work_duration,
+            "short_break_duration": self.short_break_duration,
+            "long_break_duration": self.long_break_duration,
+            "autostart_breaks": self.autostart_breaks,
+            "autostart_work": self.autostart_work,
+        }
+        self.db_service.save_timer_settings(settings)
 
     def print_current_settings(self):
         """Print current settings for debugging."""
@@ -485,7 +494,6 @@ class TimerWidget(QWidget):
     def reset_timer(self):
         """Reset the timer display."""
         self.time_label.setText("00:00:00")
-        self.progress_bar.setValue(0)
         self.status_label.setText("Ready to start")
 
     def update_display(self):
@@ -516,12 +524,6 @@ class TimerWidget(QWidget):
                     f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
                 )
 
-                # Update progress bar
-                progress = (
-                    (active_timer.duration - remaining) / active_timer.duration
-                ) * 100
-                self.progress_bar.setValue(int(progress))
-
                 # Update status
                 session_type = active_timer.pomodoro_session_type
                 if session_type == "work":
@@ -543,11 +545,6 @@ class TimerWidget(QWidget):
 
                 if mode == "countdown" and active_timer.duration:
                     if active_timer.duration > 0:
-                        progress = min(
-                            100, (elapsed.total_seconds() / active_timer.duration) * 100
-                        )
-                        self.progress_bar.setValue(int(progress))
-
                         if elapsed.total_seconds() >= active_timer.duration:
                             self.stop_timer()
                             self.timer_completed.emit(active_timer)
@@ -561,7 +558,6 @@ class TimerWidget(QWidget):
                                 )
         else:
             self.time_label.setText("00:00:00")
-            self.progress_bar.setValue(0)
 
     def handle_pomodoro_completion(self, completed_timer: Timer):
         """Handle Pomodoro session completion and autostart logic."""

@@ -1044,3 +1044,77 @@ class DatabaseService:
         with self.get_session() as session:
             configs = session.query(ConfigModel).all()
             return {config.key: config.value for config in configs}
+
+    def save_timer_settings(self, settings: dict) -> bool:
+        """Save timer settings to the database."""
+        try:
+            # Save countdown settings
+            self.set_config(
+                "timer_countdown_minutes", str(settings.get("countdown_minutes", 30))
+            )
+            self.set_config(
+                "timer_countdown_seconds", str(settings.get("countdown_seconds", 0))
+            )
+
+            # Save pomodoro settings
+            self.set_config(
+                "timer_work_duration", str(settings.get("work_duration", 25))
+            )
+            self.set_config(
+                "timer_short_break_duration",
+                str(settings.get("short_break_duration", 5)),
+            )
+            self.set_config(
+                "timer_long_break_duration",
+                str(settings.get("long_break_duration", 15)),
+            )
+            self.set_config(
+                "timer_autostart_breaks", str(settings.get("autostart_breaks", True))
+            )
+            self.set_config(
+                "timer_autostart_work", str(settings.get("autostart_work", True))
+            )
+
+            return True
+        except Exception as e:
+            print(f"Error saving timer settings: {e}")
+            return False
+
+    def load_timer_settings(self) -> dict:
+        """Load timer settings from the database."""
+        try:
+            return {
+                "countdown_minutes": int(
+                    self.get_config("timer_countdown_minutes", "30")
+                ),
+                "countdown_seconds": int(
+                    self.get_config("timer_countdown_seconds", "0")
+                ),
+                "work_duration": int(self.get_config("timer_work_duration", "25")),
+                "short_break_duration": int(
+                    self.get_config("timer_short_break_duration", "5")
+                ),
+                "long_break_duration": int(
+                    self.get_config("timer_long_break_duration", "15")
+                ),
+                "autostart_breaks": self.get_config(
+                    "timer_autostart_breaks", "True"
+                ).lower()
+                == "true",
+                "autostart_work": self.get_config(
+                    "timer_autostart_work", "True"
+                ).lower()
+                == "true",
+            }
+        except Exception as e:
+            print(f"Error loading timer settings: {e}")
+            # Return default settings if there's an error
+            return {
+                "countdown_minutes": 30,
+                "countdown_seconds": 0,
+                "work_duration": 25,
+                "short_break_duration": 5,
+                "long_break_duration": 15,
+                "autostart_breaks": True,
+                "autostart_work": True,
+            }

@@ -190,7 +190,7 @@ class ProjectInfoDialog(BaseDialog):
                 # Handle both old string format and new dict format
                 if isinstance(tag, dict):
                     self.add_tag_to_list(tag["name"])
-                else:
+        else:
                     self.add_tag_to_list(tag)
         else:
             # Add a placeholder item when no tags
