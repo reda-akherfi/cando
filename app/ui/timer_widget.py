@@ -32,6 +32,7 @@ from app.controllers.timer_controller import TimerController
 from app.services.database import DatabaseService
 from app.ui.countdown_settings_dialog import CountdownSettingsDialog
 from app.ui.pomodoro_settings_dialog import PomodoroSettingsDialog
+from app.ui.timer_history_dialog import TimerHistoryDialog
 
 
 class TimerWidget(QWidget):
@@ -131,8 +132,28 @@ class TimerWidget(QWidget):
         self.mode_button_group.addButton(self.pomodoro_radio)
         mode_layout.addWidget(self.pomodoro_radio)
 
-        # Add spacer to push settings button to the right
-        mode_layout.addStretch()
+        # History button
+        self.view_history_button = QPushButton("History")
+        self.view_history_button.setToolTip("View Timer History")
+        self.view_history_button.clicked.connect(self.open_timer_history)
+        self.view_history_button.setMinimumSize(60, 30)
+        self.view_history_button.setStyleSheet(
+            """
+            QPushButton {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: #f8f8f8;
+                padding: 4px 8px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+            QPushButton:pressed {
+                background-color: #d0d0d0;
+            }
+        """
+        )
+        mode_layout.addWidget(self.view_history_button)
 
         # Settings button (cog wheel)
         self.settings_button = QToolButton()
@@ -162,6 +183,9 @@ class TimerWidget(QWidget):
         """
         )
         mode_layout.addWidget(self.settings_button)
+
+        # Add spacer to push buttons to the left
+        mode_layout.addStretch()
 
         # Connect the button group to the mode change handler
         self.mode_button_group.buttonClicked.connect(self.on_mode_changed)
@@ -201,14 +225,6 @@ class TimerWidget(QWidget):
         self.reset_button.setMinimumHeight(40)
         controls_layout.addWidget(self.reset_button)
         layout.addLayout(controls_layout)
-
-        # Timer history
-        history_group = QGroupBox("Recent Timers")
-        history_layout = QVBoxLayout(history_group)
-        self.history_list = QListWidget()
-        self.history_list.setMaximumHeight(150)
-        history_layout.addWidget(self.history_list)
-        layout.addWidget(history_group)
 
         # Statistics
         stats_group = QGroupBox("Today's Statistics")
@@ -488,7 +504,6 @@ class TimerWidget(QWidget):
             self.stop_button.setEnabled(False)
             self.status_label.setText("Timer stopped")
             self.timer_stopped.emit(timer)
-            self.refresh_history()
             self.update_statistics()
 
     def reset_timer(self):
@@ -672,33 +687,10 @@ class TimerWidget(QWidget):
             self.status_label.setText(break_label)
             self.timer_started.emit(timer)
 
-    def refresh_history(self):
-        """Refresh the timer history list."""
-        self.history_list.clear()
-        if self.current_task:
-            timers = self.timer_controller.get_task_timers(self.current_task.id)
-            for timer in timers[-10:]:
-                if timer.end:
-                    duration = timer.end - timer.start
-                    hours, remainder = divmod(duration.total_seconds(), 3600)
-                    minutes, seconds = divmod(remainder, 60)
-
-                    # Format timer information
-                    time_str = f"{timer.start.strftime('%H:%M')} - {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
-
-                    if timer.type == "pomodoro" and timer.pomodoro_session_type:
-                        session_info = (
-                            f" ({timer.pomodoro_session_type.replace('_', ' ').title()}"
-                        )
-                        if timer.pomodoro_session_number:
-                            session_info += f" #{timer.pomodoro_session_number}"
-                        session_info += ")"
-                        item_text = f"{time_str}{session_info}"
-                    else:
-                        item_text = f"{time_str} ({timer.type})"
-
-                    item = QListWidgetItem(item_text)
-                    self.history_list.addItem(item)
+    def open_timer_history(self):
+        """Open the timer history dialog."""
+        dialog = TimerHistoryDialog(self.db_service, self)
+        dialog.exec()
 
     def update_statistics(self):
         """Update the statistics display."""
