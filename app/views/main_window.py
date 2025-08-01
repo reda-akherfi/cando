@@ -1233,6 +1233,79 @@ class MainWindow(QMainWindow):
                 color: #999999;
                 border-color: #666666;
             }}
+            
+            /* Scrollbar styling for dark mode */
+            QScrollBar:vertical {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+                width: 12px;
+                border-radius: 6px;
+                margin: 0px;
+            }}
+            
+            QScrollBar::handle:vertical {{
+                background-color: {colors.get('mid', '#2d2d30')};
+                border-radius: 6px;
+                min-height: 20px;
+                margin: 2px;
+            }}
+            
+            QScrollBar::handle:vertical:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+            }}
+            
+            QScrollBar::handle:vertical:pressed {{
+                background-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QScrollBar::add-line:vertical {{
+                height: 0px;
+                background-color: transparent;
+            }}
+            
+            QScrollBar::sub-line:vertical {{
+                height: 0px;
+                background-color: transparent;
+            }}
+            
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background-color: transparent;
+            }}
+            
+            QScrollBar:horizontal {{
+                background-color: {colors.get('dark', '#1e1e1e')};
+                height: 12px;
+                border-radius: 6px;
+                margin: 0px;
+            }}
+            
+            QScrollBar::handle:horizontal {{
+                background-color: {colors.get('mid', '#2d2d30')};
+                border-radius: 6px;
+                min-width: 20px;
+                margin: 2px;
+            }}
+            
+            QScrollBar::handle:horizontal:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+            }}
+            
+            QScrollBar::handle:horizontal:pressed {{
+                background-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QScrollBar::add-line:horizontal {{
+                width: 0px;
+                background-color: transparent;
+            }}
+            
+            QScrollBar::sub-line:horizontal {{
+                width: 0px;
+                background-color: transparent;
+            }}
+            
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+                background-color: transparent;
+            }}
             """
 
             app.setStyleSheet(stylesheet)
