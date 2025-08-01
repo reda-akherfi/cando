@@ -196,6 +196,10 @@ class MainWindow(QMainWindow):
         self.chart_title_label.setAlignment(Qt.AlignCenter)
         self.chart_title_label.setProperty("class", "chart-title")
 
+        # Create refresh button
+        refresh_button = QPushButton("Refresh Charts")
+        refresh_button.clicked.connect(self.refresh_charts)
+
         # Navigation arrows (grouped together)
         arrows_layout = QHBoxLayout()
         arrows_layout.setSpacing(5)  # Small spacing between arrows
@@ -215,8 +219,10 @@ class MainWindow(QMainWindow):
         arrows_layout.addWidget(self.prev_chart_btn)
         arrows_layout.addWidget(self.next_chart_btn)
 
+        # Group all buttons together on the right
         nav_layout.addWidget(self.chart_title_label)
-        nav_layout.addStretch()  # Push arrows to the right
+        nav_layout.addStretch()  # Push everything to the right
+        nav_layout.addWidget(refresh_button)
         nav_layout.addLayout(arrows_layout)
 
         # Create stacked widget for charts
@@ -233,14 +239,9 @@ class MainWindow(QMainWindow):
         ]
         self.current_chart_index = 0
 
-        # Create refresh button
-        refresh_button = QPushButton("Refresh Charts")
-        refresh_button.clicked.connect(self.refresh_charts)
-
         # Add widgets to layout
         layout.addLayout(nav_layout)
         layout.addWidget(self.chart_stack)
-        layout.addWidget(refresh_button)
 
         # Update navigation buttons state
         self.update_navigation_buttons()
