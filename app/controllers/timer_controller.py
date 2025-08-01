@@ -129,10 +129,12 @@ class TimerController:
             count_down = work_count_down
         elif session_type == "short_break":
             duration = short_break_duration * 60  # Convert to seconds
+            # Break sessions use the same number as the work session they follow
             session_number = self.pomodoro_session_count
             count_down = short_break_count_down
         elif session_type == "long_break":
             duration = long_break_duration * 60  # Convert to seconds
+            # Break sessions use the same number as the work session they follow
             session_number = self.pomodoro_session_count
             count_down = long_break_count_down
         else:
@@ -298,33 +300,29 @@ class TimerController:
         completed_timer = self.stop_timer()
 
         if completed_timer and completed_timer.type == "pomodoro":
-            # Determine next session type
-            next_session_type = self.get_next_pomodoro_session_type()
+            # Determine next session type based on what we just completed
+            if completed_timer.pomodoro_session_type == "work":
+                # Just completed a work session, so next should be a break
+                next_session_type = self.get_next_pomodoro_session_type()
+            elif completed_timer.pomodoro_session_type in ["short_break", "long_break"]:
+                # Just completed a break session, so next should be a work session
+                # Don't increment count here - it will be incremented when starting the work session
+                next_session_type = "work"
+            else:
+                # Fallback
+                next_session_type = self.get_next_pomodoro_session_type()
 
             # Start the next session
-            if next_session_type == "work":
-                self.pomodoro_session_count += 1
-                return self.start_pomodoro_session(
-                    task_id=completed_timer.task_id,
-                    session_type="work",
-                    work_duration=work_duration,
-                    short_break_duration=short_break_duration,
-                    long_break_duration=long_break_duration,
-                    work_count_down=work_count_down,
-                    short_break_count_down=short_break_count_down,
-                    long_break_count_down=long_break_count_down,
-                )
-            else:
-                return self.start_pomodoro_session(
-                    task_id=completed_timer.task_id,
-                    session_type=next_session_type,
-                    work_duration=work_duration,
-                    short_break_duration=short_break_duration,
-                    long_break_duration=long_break_duration,
-                    work_count_down=work_count_down,
-                    short_break_count_down=short_break_count_down,
-                    long_break_count_down=long_break_count_down,
-                )
+            return self.start_pomodoro_session(
+                task_id=completed_timer.task_id,
+                session_type=next_session_type,
+                work_duration=work_duration,
+                short_break_duration=short_break_duration,
+                long_break_duration=long_break_duration,
+                work_count_down=work_count_down,
+                short_break_count_down=short_break_count_down,
+                long_break_count_down=long_break_count_down,
+            )
 
         return completed_timer
 

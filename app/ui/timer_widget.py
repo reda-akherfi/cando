@@ -878,7 +878,7 @@ class TimerWidget(QWidget):
         )
         if timer:
             self.start_button.setEnabled(False)
-            self.stop_button.setEnabled(True)
+            self.skip_button.setEnabled(True)
             self.status_label.setText(f"Work Session: {self.current_task.name}")
             self.timer_started.emit(timer)
 
@@ -913,7 +913,7 @@ class TimerWidget(QWidget):
         )
         if timer:
             self.start_button.setEnabled(False)
-            self.stop_button.setEnabled(True)
+            self.skip_button.setEnabled(True)
             break_label = "Short Break" if break_type == "short_break" else "Long Break"
             self.status_label.setText(break_label)
             self.timer_started.emit(timer)
