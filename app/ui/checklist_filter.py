@@ -42,7 +42,27 @@ class ChecklistFilterDialog(QDialog):
         """Set up the user interface."""
         self.setWindowTitle(f"Select {self.title}")
         self.setModal(True)
-        self.setFixedSize(300, 400)
+
+        # Calculate dynamic size based on number of items
+        # Each checkbox takes approximately 22px (14px height + 4px spacing + 4px padding)
+        # Add space for title, buttons, margins, and scroll area padding
+        checkbox_height = 22
+        title_height = 30
+        button_height = 30
+        margins = 16  # 8px top + 8px bottom
+        scroll_padding = 16  # 8px top + 8px bottom in scroll area
+
+        # Calculate content height needed
+        content_height = (len(self.items) * checkbox_height) + scroll_padding
+
+        # Calculate total dialog height
+        total_height = title_height + button_height + content_height + margins
+
+        # Use current size (400px) as maximum height
+        max_height = 400
+        dialog_height = min(total_height, max_height)
+
+        self.setFixedSize(300, dialog_height)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
 
         layout = QVBoxLayout(self)
@@ -55,66 +75,7 @@ class ChecklistFilterDialog(QDialog):
         title_label.setStyleSheet("color: #cccccc;")
         layout.addWidget(title_label)
 
-        # Scroll area for checkboxes
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setStyleSheet(
-            """
-            QScrollArea {
-                border: 1px solid #4c4c4c;
-                border-radius: 4px;
-                background-color: #2d2d30;
-            }
-        """
-        )
-
-        # Container for checkboxes
-        checkbox_container = QWidget()
-        checkbox_layout = QVBoxLayout(checkbox_container)
-        checkbox_layout.setContentsMargins(8, 8, 8, 8)
-        checkbox_layout.setSpacing(4)
-
-        # Add checkboxes for each item
-        for item in self.items:
-            checkbox = QCheckBox(item)
-            # Store the item as a property on the checkbox for easy access
-            checkbox.item_name = item
-            # Set the initial state before connecting the signal to avoid triggering it
-            checkbox.setChecked(item in self.selected_items)
-            checkbox.stateChanged.connect(self.on_checkbox_changed)
-            # Store the checkbox for later access
-            self.checkboxes[item] = checkbox
-            checkbox.setStyleSheet(
-                """
-                QCheckBox {
-                    color: #cccccc;
-                    font-size: 10px;
-                    spacing: 6px;
-                }
-                QCheckBox::indicator {
-                    width: 14px;
-                    height: 14px;
-                    border: 1px solid #4c4c4c;
-                    border-radius: 2px;
-                    background-color: #2d2d30;
-                }
-                QCheckBox::indicator:checked {
-                    background-color: #0078d4;
-                    border-color: #0078d4;
-                }
-                QCheckBox::indicator:hover {
-                    border-color: #0078d4;
-                }
-            """
-            )
-            checkbox_layout.addWidget(checkbox)
-
-        scroll_area.setWidget(checkbox_container)
-        layout.addWidget(scroll_area)
-
-        # Action buttons
+        # Action buttons at the top
         button_layout = QHBoxLayout()
 
         select_all_btn = QPushButton("Select All")
@@ -196,6 +157,65 @@ class ChecklistFilterDialog(QDialog):
         button_layout.addWidget(ok_btn)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
+
+        # Scroll area for checkboxes
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet(
+            """
+            QScrollArea {
+                border: 1px solid #4c4c4c;
+                border-radius: 4px;
+                background-color: #2d2d30;
+            }
+        """
+        )
+
+        # Container for checkboxes
+        checkbox_container = QWidget()
+        checkbox_layout = QVBoxLayout(checkbox_container)
+        checkbox_layout.setContentsMargins(8, 8, 8, 8)
+        checkbox_layout.setSpacing(4)
+
+        # Add checkboxes for each item
+        for item in self.items:
+            checkbox = QCheckBox(item)
+            # Store the item as a property on the checkbox for easy access
+            checkbox.item_name = item
+            # Set the initial state before connecting the signal to avoid triggering it
+            checkbox.setChecked(item in self.selected_items)
+            checkbox.stateChanged.connect(self.on_checkbox_changed)
+            # Store the checkbox for later access
+            self.checkboxes[item] = checkbox
+            checkbox.setStyleSheet(
+                """
+                QCheckBox {
+                    color: #cccccc;
+                    font-size: 10px;
+                    spacing: 6px;
+                }
+                QCheckBox::indicator {
+                    width: 14px;
+                    height: 14px;
+                    border: 1px solid #4c4c4c;
+                    border-radius: 2px;
+                    background-color: #2d2d30;
+                }
+                QCheckBox::indicator:checked {
+                    background-color: #0078d4;
+                    border-color: #0078d4;
+                }
+                QCheckBox::indicator:hover {
+                    border-color: #0078d4;
+                }
+            """
+            )
+            checkbox_layout.addWidget(checkbox)
+
+        scroll_area.setWidget(checkbox_container)
+        layout.addWidget(scroll_area)
 
         # Set dialog styling
         self.setStyleSheet(
