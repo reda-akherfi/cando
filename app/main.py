@@ -33,10 +33,10 @@ def main():
     timer_controller = TimerController(db_service)
     data_initializer = DataInitializer(db_service)
 
-    # Initialize sample data if database is empty
+    # Initialize default configuration only (no sample data)
     if data_initializer.is_database_empty():
-        print("Initializing sample data...")
-        data_initializer.initialize_sample_data()
+        print("Initializing default configuration...")
+        data_initializer.initialize_default_config()
 
     # Create main window with services
     window = MainWindow(db_service, analytics_service, timer_controller)

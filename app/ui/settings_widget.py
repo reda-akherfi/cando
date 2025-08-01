@@ -484,11 +484,6 @@ class SettingsWidget(QWidget):
         clear_btn.setProperty("class", "danger-button")
         cleanup_layout.addRow("Clear data:", clear_btn)
 
-        # Reset to sample data button
-        sample_btn = QPushButton("Reset to Sample Data")
-        sample_btn.clicked.connect(self.reset_to_sample_data)
-        cleanup_layout.addRow("Reset to sample:", sample_btn)
-
         content_layout.addWidget(cleanup_group)
 
         content_layout.addStretch()
@@ -656,11 +651,6 @@ class SettingsWidget(QWidget):
     def clear_all_data(self):
         """Clear all application data."""
         # This will be implemented to clear data
-        pass
-
-    def reset_to_sample_data(self):
-        """Reset to sample data."""
-        # This will be implemented to reset to sample data
         pass
 
     def load_settings(self):

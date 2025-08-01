@@ -2093,15 +2093,6 @@ class MainWindow(QMainWindow):
         initializer.clear_all_data()
         self.refresh_data()
 
-    def reset_to_sample_data(self):
-        """Reset database to sample data."""
-        from app.services.data_init import DataInitializer
-
-        initializer = DataInitializer(self.db_service)
-        initializer.clear_all_data()
-        initializer.initialize_sample_data()
-        self.refresh_data()
-
     def get_all_project_statuses(self) -> List[str]:
         """Get all possible project statuses from database and hardcoded values."""
         # Get all statuses currently used in projects
