@@ -99,7 +99,16 @@ class TimerModel(Base):
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     start = Column(DateTime, nullable=False)
     end = Column(DateTime, nullable=True)
-    type = Column(String(20), default="stopwatch")  # stopwatch, countdown, maduro
+    type = Column(String(20), default="stopwatch")  # stopwatch, countdown, pomodoro
+    duration = Column(
+        Integer, nullable=True
+    )  # Duration in seconds for countdown/pomodoro
+    pomodoro_session_type = Column(
+        String(20), nullable=True
+    )  # work, short_break, long_break
+    pomodoro_session_number = Column(
+        Integer, nullable=True
+    )  # Session number in the cycle
 
     # Relationships
     task = relationship("TaskModel", back_populates="timers")
@@ -786,7 +795,7 @@ class DatabaseService:
                     # Remove old tags
                     current_tags = self._get_task_tags(session, task_id)
                     for tag in current_tags:
-                        self.remove_task_tag(task_id, tag)
+                        self.remove_task_tag(task_id, tag["name"])
                     # Add new tags
                     for tag in tags:
                         self.add_task_tag(task_id, tag)
@@ -881,6 +890,9 @@ class DatabaseService:
             start=db_timer.start,
             end=db_timer.end,
             type=db_timer.type,
+            duration=db_timer.duration,
+            pomodoro_session_type=db_timer.pomodoro_session_type,
+            pomodoro_session_number=db_timer.pomodoro_session_number,
         )
 
     def get_project_tags(self, project_id: int) -> List[dict]:
@@ -1032,3 +1044,234 @@ class DatabaseService:
         with self.get_session() as session:
             configs = session.query(ConfigModel).all()
             return {config.key: config.value for config in configs}
+
+    def save_timer_settings(self, settings: dict) -> bool:
+        """Save timer settings to the database."""
+        try:
+            # Save countdown settings
+            self.set_config(
+                "timer_countdown_minutes", str(settings.get("countdown_minutes", 30))
+            )
+            self.set_config(
+                "timer_countdown_seconds", str(settings.get("countdown_seconds", 0))
+            )
+            self.set_config(
+                "timer_countdown_count_down",
+                str(settings.get("countdown_count_down", True)),
+            )
+
+            # Save pomodoro settings
+            self.set_config(
+                "timer_work_duration", str(settings.get("work_duration", 25))
+            )
+            self.set_config(
+                "timer_short_break_duration",
+                str(settings.get("short_break_duration", 5)),
+            )
+            self.set_config(
+                "timer_long_break_duration",
+                str(settings.get("long_break_duration", 15)),
+            )
+            self.set_config(
+                "timer_autostart_breaks", str(settings.get("autostart_breaks", True))
+            )
+            self.set_config(
+                "timer_autostart_work", str(settings.get("autostart_work", True))
+            )
+            self.set_config(
+                "timer_work_count_down", str(settings.get("work_count_down", True))
+            )
+            self.set_config(
+                "timer_short_break_count_down",
+                str(settings.get("short_break_count_down", True)),
+            )
+            self.set_config(
+                "timer_long_break_count_down",
+                str(settings.get("long_break_count_down", True)),
+            )
+
+            return True
+        except Exception as e:
+            print(f"Error saving timer settings: {e}")
+            return False
+
+    def load_timer_settings(self) -> dict:
+        """Load timer settings from the database."""
+        try:
+            return {
+                "countdown_minutes": int(
+                    self.get_config("timer_countdown_minutes", "30")
+                ),
+                "countdown_seconds": int(
+                    self.get_config("timer_countdown_seconds", "0")
+                ),
+                "countdown_count_down": self.get_config(
+                    "timer_countdown_count_down", "True"
+                ).lower()
+                == "true",
+                "work_duration": int(self.get_config("timer_work_duration", "25")),
+                "short_break_duration": int(
+                    self.get_config("timer_short_break_duration", "5")
+                ),
+                "long_break_duration": int(
+                    self.get_config("timer_long_break_duration", "15")
+                ),
+                "autostart_breaks": self.get_config(
+                    "timer_autostart_breaks", "True"
+                ).lower()
+                == "true",
+                "autostart_work": self.get_config(
+                    "timer_autostart_work", "True"
+                ).lower()
+                == "true",
+                "work_count_down": self.get_config(
+                    "timer_work_count_down", "True"
+                ).lower()
+                == "true",
+                "short_break_count_down": self.get_config(
+                    "timer_short_break_count_down", "True"
+                ).lower()
+                == "true",
+                "long_break_count_down": self.get_config(
+                    "timer_long_break_count_down", "True"
+                ).lower()
+                == "true",
+            }
+        except Exception as e:
+            print(f"Error loading timer settings: {e}")
+            # Return default settings if there's an error
+            return {
+                "countdown_minutes": 30,
+                "countdown_seconds": 0,
+                "countdown_count_down": True,
+                "work_duration": 25,
+                "short_break_duration": 5,
+                "long_break_duration": 15,
+                "autostart_breaks": True,
+                "autostart_work": True,
+                "work_count_down": True,
+                "short_break_count_down": True,
+                "long_break_count_down": True,
+            }
+
+    def save_theme_settings(self, theme_config: dict) -> bool:
+        """Save theme settings to the database."""
+        try:
+            import json
+
+            self.set_config("theme_config", json.dumps(theme_config))
+            return True
+        except Exception as e:
+            print(f"Error saving theme settings: {e}")
+            return False
+
+    def load_theme_settings(self) -> dict:
+        """Load theme settings from the database."""
+        try:
+            import json
+
+            theme_json = self.get_config("theme_config", None)
+            if theme_json:
+                return json.loads(theme_json)
+        except Exception as e:
+            print(f"Error loading theme settings: {e}")
+        return None
+
+    def save_general_settings(self, settings: dict) -> bool:
+        """Save general settings to the database."""
+        try:
+            for key, value in settings.items():
+                self.set_config(f"general_{key}", str(value))
+            return True
+        except Exception as e:
+            print(f"Error saving general settings: {e}")
+            return False
+
+    def load_general_settings(self) -> dict:
+        """Load general settings from the database."""
+        try:
+            return {
+                "start_maximized": self.get_config(
+                    "general_start_maximized", "False"
+                ).lower()
+                == "true",
+                "auto_save_interval": int(
+                    self.get_config("general_auto_save_interval", "5")
+                ),
+                "language": self.get_config("general_language", "English"),
+                "show_tooltips": self.get_config(
+                    "general_show_tooltips", "True"
+                ).lower()
+                == "true",
+                "confirm_deletions": self.get_config(
+                    "general_confirm_deletions", "True"
+                ).lower()
+                == "true",
+                "show_status_bar": self.get_config(
+                    "general_show_status_bar", "True"
+                ).lower()
+                == "true",
+                "chart_update_frequency": int(
+                    self.get_config("general_chart_update_frequency", "5")
+                ),
+                "cache_size": int(self.get_config("general_cache_size", "100")),
+            }
+        except Exception as e:
+            print(f"Error loading general settings: {e}")
+            return {
+                "start_maximized": False,
+                "auto_save_interval": 5,
+                "language": "English",
+                "show_tooltips": True,
+                "confirm_deletions": True,
+                "show_status_bar": True,
+                "chart_update_frequency": 5,
+                "cache_size": 100,
+            }
+
+    def save_notification_settings(self, settings: dict) -> bool:
+        """Save notification settings to the database."""
+        try:
+            for key, value in settings.items():
+                self.set_config(f"notification_{key}", str(value))
+            return True
+        except Exception as e:
+            print(f"Error saving notification settings: {e}")
+            return False
+
+    def load_notification_settings(self) -> dict:
+        """Load notification settings from the database."""
+        try:
+            return {
+                "notify_success": self.get_config(
+                    "notification_notify_success", "True"
+                ).lower()
+                == "true",
+                "notify_error": self.get_config(
+                    "notification_notify_error", "True"
+                ).lower()
+                == "true",
+                "notify_warning": self.get_config(
+                    "notification_notify_warning", "True"
+                ).lower()
+                == "true",
+                "notify_info": self.get_config(
+                    "notification_notify_info", "True"
+                ).lower()
+                == "true",
+                "duration": int(self.get_config("notification_duration", "5")),
+                "position": self.get_config("notification_position", "Top-Right"),
+                "sound": self.get_config("notification_sound", "True").lower()
+                == "true",
+            }
+        except Exception as e:
+            print(f"Error loading notification settings: {e}")
+            return {
+                "notify_success": True,
+                "notify_error": True,
+                "notify_warning": True,
+                "notify_info": True,
+                "duration": 5,
+                "position": "Top-Right",
+                "sound": True,
+            }
