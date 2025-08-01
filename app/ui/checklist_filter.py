@@ -302,8 +302,8 @@ class ChecklistFilterWidget(QWidget):
         self.title_label.setStyleSheet("color: #cccccc;")
         layout.addWidget(self.title_label)
 
-        # Selected items display (clickable)
-        self.selected_display = QPushButton("All")
+        # Selected items display (clickable) with integrated dropdown arrow
+        self.selected_display = QPushButton("All ▼")
         self.selected_display.setFont(QFont("Arial", 9))
         self.selected_display.clicked.connect(self.show_dropdown)
         self.selected_display.setStyleSheet(
@@ -324,28 +324,6 @@ class ChecklistFilterWidget(QWidget):
         """
         )
         layout.addWidget(self.selected_display)
-
-        # Dropdown arrow button
-        self.dropdown_btn = QPushButton("▼")
-        self.dropdown_btn.setMaximumWidth(20)
-        self.dropdown_btn.setMaximumHeight(20)
-        self.dropdown_btn.clicked.connect(self.show_dropdown)
-        self.dropdown_btn.setStyleSheet(
-            """
-            QPushButton {
-                border: 1px solid #4c4c4c;
-                border-radius: 2px;
-                background-color: #3c3c3c;
-                color: #cccccc;
-                font-size: 8px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #4c4c4c;
-            }
-        """
-        )
-        layout.addWidget(self.dropdown_btn)
 
     def set_items(self, items: List[str]):
         """Set the available items for selection."""
@@ -380,17 +358,17 @@ class ChecklistFilterWidget(QWidget):
     def update_display(self):
         """Update the display of selected items."""
         if not self.selected_items or len(self.selected_items) == len(self.items):
-            self.selected_display.setText("All")
+            self.selected_display.setText("All ▼")
         elif len(self.selected_items) == 1:
-            self.selected_display.setText(list(self.selected_items)[0])
+            self.selected_display.setText(f"{list(self.selected_items)[0]} ▼")
         else:
             # Show first few items with count
             items_list = list(self.selected_items)
             if len(items_list) <= 2:
-                self.selected_display.setText(", ".join(items_list))
+                self.selected_display.setText(f"{', '.join(items_list)} ▼")
             else:
                 self.selected_display.setText(
-                    f"{items_list[0]}, {items_list[1]} +{len(items_list)-2}"
+                    f"{items_list[0]}, {items_list[1]} +{len(items_list)-2} ▼"
                 )
 
     def show_dropdown(self):
