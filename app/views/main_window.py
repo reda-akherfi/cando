@@ -5,6 +5,7 @@ This module contains the main window class that manages the application's
 primary user interface with tabbed views for different functionality.
 """
 
+from typing import List
 from PySide6.QtWidgets import (
     QMainWindow,
     QTabWidget,
@@ -41,6 +42,7 @@ from app.ui.tag_list_widget import TagListWidget
 from app.ui.timer_widget import TimerWidget
 from app.ui.notification_widget import NotificationManager
 from app.ui.settings_widget import SettingsWidget
+from app.ui.checklist_filter import ChecklistFilterWidget
 from app.ui.ui_main import UiMainWindow
 from app.models.project import Project
 from app.models.task import Task
@@ -290,33 +292,22 @@ class MainWindow(QMainWindow):
 
         # Filter controls
         # Status filter
-        status_label = QLabel("Status:")
-        self.status_filter = QComboBox()
-        self.status_filter.addItems(
-            ["All", "active", "paused", "completed", "cancelled"]
-        )
-        self.status_filter.currentTextChanged.connect(self.refresh_project_list)
-        self.status_filter.setMaximumWidth(100)
+        self.status_filter = ChecklistFilterWidget("Status")
+        self.status_filter.set_items(self.get_all_project_statuses())
+        self.status_filter.set_selection_changed_callback(self.refresh_project_list)
 
         # Priority filter
-        priority_label = QLabel("Priority:")
-        self.priority_filter = QComboBox()
-        self.priority_filter.addItems(["All", "low", "medium", "high"])
-        self.priority_filter.currentTextChanged.connect(self.refresh_project_list)
-        self.priority_filter.setMaximumWidth(100)
+        self.priority_filter = ChecklistFilterWidget("Priority")
+        self.priority_filter.set_items(self.get_all_project_priorities())
+        self.priority_filter.set_selection_changed_callback(self.refresh_project_list)
 
         # Tag filter
-        tag_label = QLabel("Tag:")
-        self.tag_filter = QComboBox()
-        self.tag_filter.addItem("All")
-        self.tag_filter.currentTextChanged.connect(self.refresh_project_list)
-        self.tag_filter.setMaximumWidth(120)
+        self.tag_filter = ChecklistFilterWidget("Tag")
+        self.tag_filter.set_items([])  # Will be populated later
+        self.tag_filter.set_selection_changed_callback(self.refresh_project_list)
 
-        controls_layout.addWidget(status_label)
         controls_layout.addWidget(self.status_filter)
-        controls_layout.addWidget(priority_label)
         controls_layout.addWidget(self.priority_filter)
-        controls_layout.addWidget(tag_label)
         controls_layout.addWidget(self.tag_filter)
         controls_layout.addStretch()
 
@@ -386,38 +377,31 @@ class MainWindow(QMainWindow):
 
         # Task filters
         # Task status filter
-        task_status_label = QLabel("Status:")
-        self.task_status_filter = QComboBox()
-        self.task_status_filter.addItems(["All", "pending", "completed"])
-        self.task_status_filter.currentTextChanged.connect(self.on_task_filter_changed)
-        self.task_status_filter.setMaximumWidth(100)
+        self.task_status_filter = ChecklistFilterWidget("Status")
+        self.task_status_filter.set_items(self.get_all_task_statuses())
+        self.task_status_filter.set_selection_changed_callback(
+            self.on_task_filter_changed
+        )
         self.task_status_filter.setEnabled(False)  # Disabled until project is selected
 
         # Task priority filter
-        task_priority_label = QLabel("Priority:")
-        self.task_priority_filter = QComboBox()
-        self.task_priority_filter.addItems(["All", "low", "medium", "high"])
-        self.task_priority_filter.currentTextChanged.connect(
+        self.task_priority_filter = ChecklistFilterWidget("Priority")
+        self.task_priority_filter.set_items(self.get_all_task_priorities())
+        self.task_priority_filter.set_selection_changed_callback(
             self.on_task_filter_changed
         )
-        self.task_priority_filter.setMaximumWidth(100)
         self.task_priority_filter.setEnabled(
             False
         )  # Disabled until project is selected
 
         # Task tag filter
-        task_tag_label = QLabel("Tag:")
-        self.task_tag_filter = QComboBox()
-        self.task_tag_filter.addItem("All")
-        self.task_tag_filter.currentTextChanged.connect(self.on_task_filter_changed)
-        self.task_tag_filter.setMaximumWidth(120)
+        self.task_tag_filter = ChecklistFilterWidget("Tag")
+        self.task_tag_filter.set_items([])  # Will be populated later
+        self.task_tag_filter.set_selection_changed_callback(self.on_task_filter_changed)
         self.task_tag_filter.setEnabled(False)  # Disabled until project is selected
 
-        task_controls_layout.addWidget(task_status_label)
         task_controls_layout.addWidget(self.task_status_filter)
-        task_controls_layout.addWidget(task_priority_label)
         task_controls_layout.addWidget(self.task_priority_filter)
-        task_controls_layout.addWidget(task_tag_label)
         task_controls_layout.addWidget(self.task_tag_filter)
         task_controls_layout.addStretch()
 
@@ -1341,36 +1325,53 @@ class MainWindow(QMainWindow):
 
     def refresh_project_list(self):
         """Refresh the project list display."""
-        status_filter = self.status_filter.currentText()
-        priority_filter = self.priority_filter.currentText()
-        tag_filter = self.tag_filter.currentText()
+        status_filters = self.status_filter.get_selected_items()
+        priority_filters = self.priority_filter.get_selected_items()
+        tag_filters = self.tag_filter.get_selected_items()
         search_text = self.search_input.text().strip()
+
+        print(f"DEBUG: status_filters = {status_filters}")
+        print(f"DEBUG: priority_filters = {priority_filters}")
+        print(f"DEBUG: tag_filters = {tag_filters}")
 
         # Get all projects
         all_projects = self.db_service.get_projects()
+        print(f"DEBUG: total projects = {len(all_projects)}")
 
         # Apply filters
         filtered_projects = all_projects
 
-        # Filter by status
-        if status_filter != "All":
+        # Filter by status (only if specific statuses are selected)
+        if status_filters:
+            print(f"DEBUG: filtering by status: {status_filters}")
+            before_count = len(filtered_projects)
             filtered_projects = [
-                p for p in filtered_projects if p.status == status_filter
+                p for p in filtered_projects if p.status in status_filters
             ]
+            after_count = len(filtered_projects)
+            print(f"DEBUG: status filter: {before_count} -> {after_count} projects")
 
-        # Filter by priority
-        if priority_filter != "All":
+        # Filter by priority (only if specific priorities are selected)
+        if priority_filters:
+            print(f"DEBUG: filtering by priority: {priority_filters}")
+            before_count = len(filtered_projects)
             filtered_projects = [
-                p for p in filtered_projects if p.priority == priority_filter
+                p for p in filtered_projects if p.priority in priority_filters
             ]
+            after_count = len(filtered_projects)
+            print(f"DEBUG: priority filter: {before_count} -> {after_count} projects")
 
-        # Filter by tag
-        if tag_filter != "All":
+        # Filter by tag (only if specific tags are selected)
+        if tag_filters:
+            print(f"DEBUG: filtering by tags: {tag_filters}")
+            before_count = len(filtered_projects)
             filtered_projects = [
                 p
                 for p in filtered_projects
-                if any(tag["name"] == tag_filter for tag in p.tags)
+                if any(tag["name"] in tag_filters for tag in p.tags)
             ]
+            after_count = len(filtered_projects)
+            print(f"DEBUG: tag filter: {before_count} -> {after_count} projects")
 
         # Apply fuzzy search if there's a search query
         if search_text:
@@ -1380,13 +1381,17 @@ class MainWindow(QMainWindow):
             )
             projects = [item for item, score in search_results]
             self.search_results_label.setText(
-                f"Showing {len(projects)} of {len(filtered_projects)} results"
+                f"Showing {len(projects)} of {len(all_projects)} results"
             )
         else:
             projects = filtered_projects
             self.search_results_label.setText(
-                f"Showing {len(projects)} of {len(filtered_projects)} results"
+                f"Showing {len(projects)} of {len(all_projects)} results"
             )
+
+        print(f"DEBUG: final projects count = {len(projects)}")
+        print("DEBUG: project statuses =", [p.status for p in projects])
+        print("DEBUG: project priorities =", [p.priority for p in projects])
 
         self.project_list_widget.update_projects(projects, search_text)
 
@@ -1484,9 +1489,9 @@ class MainWindow(QMainWindow):
         ):
             return
 
-        status_filter = self.task_status_filter.currentText()
-        priority_filter = self.task_priority_filter.currentText()
-        tag_filter = self.task_tag_filter.currentText()
+        status_filters = self.task_status_filter.get_selected_items()
+        priority_filters = self.task_priority_filter.get_selected_items()
+        tag_filters = self.task_tag_filter.get_selected_items()
         search_text = self.task_search_input.text().strip()
 
         # Get all tasks for the project
@@ -1495,25 +1500,28 @@ class MainWindow(QMainWindow):
         # Apply filters
         filtered_tasks = all_tasks
 
-        # Filter by status
-        if status_filter != "All":
-            if status_filter == "completed":
-                filtered_tasks = [t for t in filtered_tasks if t.completed]
-            elif status_filter == "pending":
-                filtered_tasks = [t for t in filtered_tasks if not t.completed]
+        # Filter by status (only if specific statuses are selected)
+        if status_filters:
+            status_filtered = []
+            for task in filtered_tasks:
+                if "completed" in status_filters and task.completed:
+                    status_filtered.append(task)
+                elif "pending" in status_filters and not task.completed:
+                    status_filtered.append(task)
+            filtered_tasks = status_filtered
 
-        # Filter by priority
-        if priority_filter != "All":
+        # Filter by priority (only if specific priorities are selected)
+        if priority_filters:
             filtered_tasks = [
-                t for t in filtered_tasks if t.priority == priority_filter
+                t for t in filtered_tasks if t.priority in priority_filters
             ]
 
-        # Filter by tag
-        if tag_filter != "All":
+        # Filter by tag (only if specific tags are selected)
+        if tag_filters:
             filtered_tasks = [
                 t
                 for t in filtered_tasks
-                if any(tag["name"] == tag_filter for tag in t.tags)
+                if any(tag["name"] in tag_filters for tag in t.tags)
             ]
 
         # Apply fuzzy search if there's a search query
@@ -1524,12 +1532,12 @@ class MainWindow(QMainWindow):
             )
             tasks = [item for item, score in search_results]
             self.task_search_results_label.setText(
-                f"Showing {len(tasks)} of {len(filtered_tasks)} tasks"
+                f"Showing {len(tasks)} of {len(all_tasks)} tasks"
             )
         else:
             tasks = filtered_tasks
             self.task_search_results_label.setText(
-                f"Showing {len(tasks)} of {len(filtered_tasks)} tasks"
+                f"Showing {len(tasks)} of {len(all_tasks)} tasks"
             )
 
         self.task_list_widget.update_tasks(tasks, search_text)
@@ -2036,35 +2044,19 @@ class MainWindow(QMainWindow):
 
     def populate_project_tag_filter(self):
         """Populate the project tag filter with all available tags."""
-        self.tag_filter.clear()
-        self.tag_filter.addItem("All")
+        # Get all available tags from database
+        all_tags = self.db_service.get_all_tags()
 
-        # Get all unique tags from projects
-        all_projects = self.db_service.get_projects()
-        all_tags = set()
-        for project in all_projects:
-            if project.tags:
-                all_tags.update([tag["name"] for tag in project.tags])
-
-        # Add tags to filter
-        for tag in sorted(all_tags):
-            self.tag_filter.addItem(tag)
+        # Set tags to filter
+        self.tag_filter.set_items(sorted(all_tags))
 
     def populate_task_tag_filter(self, project_id: int):
-        """Populate the task tag filter with tags from the selected project's tasks."""
-        self.task_tag_filter.clear()
-        self.task_tag_filter.addItem("All")
+        """Populate the task tag filter with all available tags."""
+        # Get all available tags from database
+        all_tags = self.db_service.get_all_tags()
 
-        # Get all unique tags from tasks in the project
-        all_tasks = self.db_service.get_tasks(project_id=project_id)
-        all_tags = set()
-        for task in all_tasks:
-            if task.tags:
-                all_tags.update([tag["name"] for tag in task.tags])
-
-        # Add tags to filter
-        for tag in sorted(all_tags):
-            self.task_tag_filter.addItem(tag)
+        # Set tags to filter
+        self.task_tag_filter.set_items(sorted(all_tags))
 
     def clear_all_data(self):
         """Clear all data from the database."""
@@ -2082,3 +2074,63 @@ class MainWindow(QMainWindow):
         initializer.clear_all_data()
         initializer.initialize_sample_data()
         self.refresh_data()
+
+    def get_all_project_statuses(self) -> List[str]:
+        """Get all possible project statuses from database and hardcoded values."""
+        # Get all statuses currently used in projects
+        all_projects = self.db_service.get_projects()
+        used_statuses = set()
+        for project in all_projects:
+            if project.status:
+                used_statuses.add(project.status)
+
+        # Add hardcoded possible values
+        all_possible_statuses = {"active", "paused", "completed", "cancelled"}
+
+        # Combine and return sorted list
+        return sorted(list(used_statuses.union(all_possible_statuses)))
+
+    def get_all_project_priorities(self) -> List[str]:
+        """Get all possible project priorities from database and hardcoded values."""
+        # Get all priorities currently used in projects
+        all_projects = self.db_service.get_projects()
+        used_priorities = set()
+        for project in all_projects:
+            if project.priority:
+                used_priorities.add(project.priority)
+
+        # Add hardcoded possible values
+        all_possible_priorities = {"low", "medium", "high", "urgent"}
+
+        # Combine and return sorted list
+        return sorted(list(used_priorities.union(all_possible_priorities)))
+
+    def get_all_task_statuses(self) -> List[str]:
+        """Get all possible task statuses from database and hardcoded values."""
+        # Get all statuses currently used in tasks
+        all_tasks = self.db_service.get_tasks()
+        used_statuses = set()
+        for task in all_tasks:
+            status = "completed" if task.completed else "pending"
+            used_statuses.add(status)
+
+        # Add hardcoded possible values
+        all_possible_statuses = {"pending", "completed"}
+
+        # Combine and return sorted list
+        return sorted(list(used_statuses.union(all_possible_statuses)))
+
+    def get_all_task_priorities(self) -> List[str]:
+        """Get all possible task priorities from database and hardcoded values."""
+        # Get all priorities currently used in tasks
+        all_tasks = self.db_service.get_tasks()
+        used_priorities = set()
+        for task in all_tasks:
+            if task.priority:
+                used_priorities.add(task.priority)
+
+        # Add hardcoded possible values
+        all_possible_priorities = {"low", "medium", "high", "urgent"}
+
+        # Combine and return sorted list
+        return sorted(list(used_priorities.union(all_possible_priorities)))
