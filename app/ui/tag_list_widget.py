@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QComboBox,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor, QPalette, QMouseEvent
@@ -58,7 +59,7 @@ class TagItemWidget(QWidget):
 
         # Tag info layout
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
+        info_layout.setSpacing(4)  # Increased spacing between elements
 
         # Tag name with search highlighting
         name_text = self.tag.name
@@ -71,6 +72,9 @@ class TagItemWidget(QWidget):
         palette = self.palette()
         name_label.setStyleSheet(f"color: {palette.color(QPalette.Text).name()};")
         name_label.setTextFormat(Qt.RichText)
+        name_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Preferred
+        )  # Allow horizontal expansion
         info_layout.addWidget(name_label)
 
         # Tag description
@@ -80,11 +84,21 @@ class TagItemWidget(QWidget):
             # Use theme-aware secondary text color
             palette = self.palette()
             desc_label.setStyleSheet(f"color: {palette.color(QPalette.Mid).name()};")
+            desc_label.setWordWrap(True)  # Allow text to wrap to multiple lines
+            desc_label.setMinimumHeight(16)  # Ensure minimum height for text
+            desc_label.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Preferred
+            )  # Allow horizontal expansion
             info_layout.addWidget(desc_label)
 
-        layout.addLayout(info_layout)
+        layout.addLayout(info_layout, 1)  # Give info layout more space
 
-        layout.addStretch()
+        layout.addStretch(0)  # Minimal stretch
+
+        # Right side info layout
+        right_layout = QVBoxLayout()
+        right_layout.setAlignment(Qt.AlignTop | Qt.AlignRight)  # Align to top-right
+        right_layout.setSpacing(2)
 
         # Usage count
         usage_label = QLabel(f"Used {self.tag.usage_count} times")
@@ -92,7 +106,8 @@ class TagItemWidget(QWidget):
         # Use theme-aware secondary text color
         palette = self.palette()
         usage_label.setStyleSheet(f"color: {palette.color(QPalette.Mid).name()};")
-        layout.addWidget(usage_label)
+        usage_label.setAlignment(Qt.AlignRight)  # Right-align the text
+        right_layout.addWidget(usage_label)
 
         # Linked items info
         if self.tag.linked_projects or self.tag.linked_tasks:
@@ -105,7 +120,8 @@ class TagItemWidget(QWidget):
             linked_label = QLabel(f"({', '.join(linked_info)})")
             linked_label.setFont(QFont("Arial", 8))
             linked_label.setStyleSheet("color: #007bff;")
-            layout.addWidget(linked_label)
+            linked_label.setAlignment(Qt.AlignRight)  # Right-align the text
+            right_layout.addWidget(linked_label)
 
         # Popularity indicator
         if self.tag.usage_count > 5:
@@ -114,7 +130,9 @@ class TagItemWidget(QWidget):
             popularity_frame.setStyleSheet(
                 "background-color: #28a745; border-radius: 4px;"
             )
-            layout.addWidget(popularity_frame)
+            right_layout.addWidget(popularity_frame)
+
+        layout.addLayout(right_layout, 0)  # Give right layout minimal space
 
     def mousePressEvent(self, event: QMouseEvent):
         """Handle mouse press events."""
@@ -171,7 +189,25 @@ class TagListWidget(QListWidget):
         """Add a tag to the list."""
         item = QListWidgetItem(self)
         item_widget = TagItemWidget(tag, search_query)
-        item.setSizeHint(item_widget.sizeHint())
+
+        # Calculate proper size hint that accounts for content
+        size_hint = item_widget.sizeHint()
+
+        # Ensure minimum height for readability
+        min_height = 60  # Minimum height in pixels for tags
+        if size_hint.height() < min_height:
+            size_hint.setHeight(min_height)
+
+        # For longer descriptions, increase height to accommodate wrapped text
+        if tag.description:
+            # Estimate lines needed for description (rough calculation)
+            # Assume ~50 characters per line for the current font size
+            chars_per_line = 50
+            estimated_lines = max(1, len(tag.description) // chars_per_line)
+            additional_height = (estimated_lines - 1) * 16  # ~16px per additional line
+            size_hint.setHeight(size_hint.height() + additional_height)
+
+        item.setSizeHint(size_hint)
         self.addItem(item)
         self.setItemWidget(item, item_widget)
         item.setData(Qt.UserRole, tag)

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMenu,
     QMessageBox,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor, QPalette, QMouseEvent
@@ -92,15 +93,14 @@ class TaskItemWidget(QWidget):
         name_label.setFont(QFont("Arial", 10, QFont.Bold))
         name_label.setStyleSheet(f"color: {self.get_text_color()};")
         name_label.setTextFormat(Qt.RichText)
+        name_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Preferred
+        )  # Allow horizontal expansion
         info_layout.addWidget(name_label)
 
         if self.task.description:
             # Highlight search terms in description
-            desc_text = (
-                self.task.description[:100] + "..."
-                if len(self.task.description) > 100
-                else self.task.description
-            )
+            desc_text = self.task.description
             if self.search_query:
                 desc_text = highlight_search_terms(desc_text, self.search_query)
 
@@ -110,13 +110,21 @@ class TaskItemWidget(QWidget):
             palette = self.palette()
             desc_label.setStyleSheet(f"color: {palette.color(QPalette.Mid).name()};")
             desc_label.setTextFormat(Qt.RichText)
+            desc_label.setWordWrap(True)  # Allow text to wrap to multiple lines
+            desc_label.setMinimumHeight(20)  # Ensure minimum height for text
+            desc_label.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Preferred
+            )  # Allow horizontal expansion
             info_layout.addWidget(desc_label)
 
-        main_layout.addLayout(info_layout)
-        main_layout.addStretch()
+        main_layout.addLayout(info_layout, 1)  # Give info layout more space
+        main_layout.addStretch(0)  # Minimal stretch
 
         # Priority and completion indicators
         indicators_layout = QVBoxLayout()
+        indicators_layout.setAlignment(
+            Qt.AlignTop | Qt.AlignRight
+        )  # Align to top-right
 
         # Priority indicator
         priority_frame = QFrame()
@@ -127,7 +135,7 @@ class TaskItemWidget(QWidget):
         priority_layout = QHBoxLayout()
         priority_layout.addWidget(priority_frame)
         priority_layout.addWidget(QLabel(self.task.priority.upper()))
-        priority_layout.addStretch()
+        priority_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
         indicators_layout.addLayout(priority_layout)
 
         # Completion indicator
@@ -136,9 +144,10 @@ class TaskItemWidget(QWidget):
         completion_label = QLabel(completion_text)
         completion_label.setFont(QFont("Arial", 8, QFont.Bold))
         completion_label.setStyleSheet(f"color: {completion_color};")
+        completion_label.setAlignment(Qt.AlignRight)  # Right-align the text
         indicators_layout.addWidget(completion_label)
 
-        main_layout.addLayout(indicators_layout)
+        main_layout.addLayout(indicators_layout, 0)  # Give indicators minimal space
 
         layout.addLayout(main_layout)
 
@@ -167,11 +176,12 @@ class TaskItemWidget(QWidget):
 
         secondary_layout.addStretch()
 
-        # Estimated hours
+        # Estimated hours - align with the indicators above
         if hasattr(self.task, "estimated_hours") and self.task.estimated_hours:
             hours_label = QLabel(f"Est: {self.task.estimated_hours}h")
             hours_label.setFont(QFont("Arial", 8))
             hours_label.setStyleSheet("color: #6c757d;")
+            hours_label.setAlignment(Qt.AlignRight)  # Right-align to match indicators
             secondary_layout.addWidget(hours_label)
 
         # Tags
@@ -252,7 +262,28 @@ class TaskListWidget(QListWidget):
         """Add a task to the list."""
         item = QListWidgetItem(self)
         item_widget = TaskItemWidget(task, search_query)
-        item.setSizeHint(item_widget.sizeHint())
+
+        # Calculate proper size hint that accounts for wrapped text
+        size_hint = item_widget.sizeHint()
+
+        # Ensure minimum height for readability
+        min_height = 80  # Minimum height in pixels
+        if size_hint.height() < min_height:
+            size_hint.setHeight(min_height)
+
+        # For longer descriptions, increase height to accommodate wrapped text
+        if task.description:
+            # Estimate lines needed for description (rough calculation)
+            # Assume ~40 characters per line for the current font size
+            chars_per_line = 40
+            estimated_lines = max(1, len(task.description) // chars_per_line)
+            additional_height = (estimated_lines - 1) * 20  # ~20px per additional line
+            size_hint.setHeight(size_hint.height() + additional_height)
+
+        # Make the item 20% taller
+        size_hint.setHeight(int(size_hint.height() * 1.2))  # 20% taller
+
+        item.setSizeHint(size_hint)
         self.addItem(item)
         self.setItemWidget(item, item_widget)
         item.setData(Qt.UserRole, task)

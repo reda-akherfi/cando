@@ -54,19 +54,25 @@ class BaseDialog(QDialog):
             if screen_width < 800 or screen_height < 600:
                 # Use smaller percentages for small screens
                 max_width = int(screen_width * 0.95)
-                max_height = int(screen_height * 0.9)
+                max_height = int(
+                    screen_height * 0.8
+                )  # Reduced from 0.9 to account for taskbar
                 min_width = 300
                 min_height = 250
             else:
                 # Use standard percentages for normal screens
                 max_width = int(screen_width * 0.8)
-                max_height = int(screen_height * 0.85)
+                max_height = int(
+                    screen_height * 0.75
+                )  # Reduced from 0.85 to account for taskbar
                 min_width = 400
                 min_height = 300
 
             # Calculate final size with reasonable caps
             dialog_width = max(min_width, min(max_width, 800))  # Cap at 800px width
-            dialog_height = max(min_height, min(max_height, 900))  # Cap at 900px height
+            dialog_height = max(
+                min_height, min(max_height, 700)
+            )  # Reduced cap from 900px to 700px for better taskbar compatibility
 
             # Resize the dialog
             self.resize(dialog_width, dialog_height)
@@ -80,7 +86,20 @@ class BaseDialog(QDialog):
             self.resize(500, 600)
 
     def center_on_screen(self, screen_geometry):
-        """Center the dialog on the screen."""
+        """Center the dialog on the screen, accounting for taskbar."""
+        # Calculate center position
         x = (screen_geometry.width() - self.width()) // 2
         y = (screen_geometry.height() - self.height()) // 2
+
+        # Ensure dialog doesn't go below the screen (accounting for taskbar)
+        # Leave at least 50px margin from bottom
+        max_y = screen_geometry.height() - self.height() - 50
+        y = min(y, max_y)
+
+        # Ensure dialog doesn't go above the screen
+        y = max(y, 0)
+
+        # Ensure dialog doesn't go off the left or right edges
+        x = max(0, min(x, screen_geometry.width() - self.width()))
+
         self.move(x, y)

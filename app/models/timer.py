@@ -16,4 +16,7 @@ class Timer:
     task_id: int
     start: datetime
     end: datetime
-    type: str  # 'maduro', 'countdown', 'stopwatch'
+    type: str  # 'pomodoro', 'countdown', 'stopwatch'
+    duration: int = None  # Duration in seconds for countdown/pomodoro
+    pomodoro_session_type: str = None  # work, short_break, long_break
+    pomodoro_session_number: int = None  # Session number in the cycle

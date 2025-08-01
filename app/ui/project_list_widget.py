@@ -255,7 +255,12 @@ class ProjectListWidget(QListWidget):
         """Add a project to the list."""
         item = QListWidgetItem(self)
         item_widget = ProjectItemWidget(project, search_query)
-        item.setSizeHint(item_widget.sizeHint())
+
+        # Calculate size hint and make it 20% taller
+        size_hint = item_widget.sizeHint()
+        size_hint.setHeight(int(size_hint.height() * 1.2))  # 20% taller
+
+        item.setSizeHint(size_hint)
         self.addItem(item)
         self.setItemWidget(item, item_widget)
         item.setData(Qt.UserRole, project)

@@ -83,7 +83,12 @@ class ProjectDialog(BaseDialog):
         tags_group = self.create_tags_section()
         scroll_layout.addWidget(tags_group)
 
-        # Buttons
+        # Set up scroll area
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
+        layout.addWidget(scroll_area)
+
+        # Buttons (outside scroll area for always accessibility)
         button_layout = QHBoxLayout()
         self.save_button = QPushButton("Save")
         self.cancel_button = QPushButton("Cancel")
@@ -101,12 +106,7 @@ class ProjectDialog(BaseDialog):
         button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.save_button)
 
-        scroll_layout.addLayout(button_layout)
-
-        # Set up scroll area
-        scroll_area.setWidget(scroll_widget)
-        scroll_area.setWidgetResizable(True)
-        layout.addWidget(scroll_area)
+        layout.addLayout(button_layout)
 
     def create_basic_info_section(self) -> QFrame:
         """Create the basic information section."""
