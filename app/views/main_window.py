@@ -31,6 +31,9 @@ from app.ui.chart_widget import (
     TimeByProjectChart,
     DailyProductivityChart,
     TimerTypeChart,
+    CumulativeWorkChart,
+    TagDistributionChart,
+    ProjectDistributionChart,
 )
 from app.ui.theme import DarkTheme, LightTheme
 from app.ui.project_dialog import ProjectDialog
@@ -189,6 +192,9 @@ class MainWindow(QMainWindow):
         self.project_chart = TimeByProjectChart()
         self.productivity_chart = DailyProductivityChart()
         self.timer_type_chart = TimerTypeChart()
+        self.cumulative_work_chart = CumulativeWorkChart()
+        self.tag_distribution_chart = TagDistributionChart()
+        self.project_distribution_chart = ProjectDistributionChart()
 
         # Create navigation controls
         nav_layout = QHBoxLayout()
@@ -232,12 +238,18 @@ class MainWindow(QMainWindow):
         self.chart_stack.addWidget(self.project_chart)
         self.chart_stack.addWidget(self.productivity_chart)
         self.chart_stack.addWidget(self.timer_type_chart)
+        self.chart_stack.addWidget(self.cumulative_work_chart)
+        self.chart_stack.addWidget(self.tag_distribution_chart)
+        self.chart_stack.addWidget(self.project_distribution_chart)
 
         # Chart titles for navigation
         self.chart_titles = [
             "Time by Project",
             "Daily Productivity",
             "Timer Type Usage",
+            "Cumulative Work Hours",
+            "Tag Distribution",
+            "Project Distribution",
         ]
         self.current_chart_index = 0
 
@@ -1422,10 +1434,25 @@ class MainWindow(QMainWindow):
         timer_stats = self.analytics_service.get_timer_type_stats()
         self.timer_type_chart.plot_timer_types(timer_stats)
 
+        # Update cumulative work chart
+        cumulative_data = self.analytics_service.get_cumulative_work_data()
+        self.cumulative_work_chart.plot_cumulative_work(cumulative_data)
+
+        # Update tag distribution chart
+        tag_distribution = self.analytics_service.get_tag_distribution()
+        self.tag_distribution_chart.plot_tag_distribution(tag_distribution)
+
+        # Update project distribution chart
+        project_distribution = self.analytics_service.get_project_distribution()
+        self.project_distribution_chart.plot_project_distribution(project_distribution)
+
         # Ensure all charts use the current theme colors
         self.project_chart.update_theme_colors()
         self.productivity_chart.update_theme_colors()
         self.timer_type_chart.update_theme_colors()
+        self.cumulative_work_chart.update_theme_colors()
+        self.tag_distribution_chart.update_theme_colors()
+        self.project_distribution_chart.update_theme_colors()
 
     def show_previous_chart(self):
         """Show the previous chart in the sequence."""

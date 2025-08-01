@@ -166,3 +166,149 @@ class AnalyticsService:
         tags = convert_tag_list(db_tags)
 
         return projects, tasks, timers, tags
+
+    def get_cumulative_work_data(self, days: int = 30) -> Dict[str, float]:
+        """
+        Calculate cumulative work hours over time, excluding break timers.
+
+        Args:
+            days: Number of days to analyze
+
+        Returns:
+            Dictionary mapping dates to cumulative hours worked (excluding breaks)
+        """
+        cumulative_hours = {}
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+
+        # Get all timers
+        all_timers = self.db_service.get_timers()
+
+        # Filter out break timers and incomplete timers
+        work_timers = [
+            timer
+            for timer in all_timers
+            if timer.end
+            and timer.start >= start_date
+            and (
+                timer.type != "pomodoro"
+                or (timer.type == "pomodoro" and timer.pomodoro_session_type == "work")
+            )
+        ]
+
+        # Sort by start date
+        work_timers.sort(key=lambda x: x.start)
+
+        # Calculate cumulative hours
+        total_hours = 0
+        current_date = start_date
+
+        for i in range(days):
+            current_date = start_date + timedelta(days=i)
+            date_str = current_date.strftime("%Y-%m-%d")
+
+            # Add hours for timers that ended on this date
+            day_timers = [
+                timer
+                for timer in work_timers
+                if timer.end.date() == current_date.date()
+            ]
+
+            day_hours = sum(
+                (timer.end - timer.start).total_seconds() / 3600 for timer in day_timers
+            )
+
+            total_hours += day_hours
+            cumulative_hours[date_str] = total_hours
+
+        return cumulative_hours
+
+    def get_tag_distribution(self) -> Dict[str, float]:
+        """
+        Calculate time distribution by tags, excluding break timers.
+
+        Returns:
+            Dictionary mapping tag names to total hours worked
+        """
+        tag_times = {}
+
+        # Get all timers, excluding break timers
+        all_timers = self.db_service.get_timers()
+        work_timers = [
+            timer
+            for timer in all_timers
+            if timer.end
+            and (
+                timer.type != "pomodoro"
+                or (timer.type == "pomodoro" and timer.pomodoro_session_type == "work")
+            )
+        ]
+
+        # Get all tasks with their tags
+        all_tasks = self.db_service.get_tasks()
+        task_tags = {}
+
+        for task in all_tasks:
+            if task.tags:
+                task_tags[task.id] = [tag["name"] for tag in task.tags]
+
+        # Calculate time per tag
+        for timer in work_timers:
+            timer_hours = (timer.end - timer.start).total_seconds() / 3600
+
+            if timer.task_id in task_tags and task_tags[timer.task_id]:
+                # Distribute time across all tags for this task
+                tags = task_tags[timer.task_id]
+                hours_per_tag = timer_hours / len(tags)
+                for tag_name in tags:
+                    tag_times[tag_name] = tag_times.get(tag_name, 0) + hours_per_tag
+            else:
+                # Task has no tags, add to "Untagged" category
+                tag_times["Untagged"] = tag_times.get("Untagged", 0) + timer_hours
+
+        return tag_times
+
+    def get_project_distribution(self) -> Dict[str, float]:
+        """
+        Calculate time distribution by projects, excluding break timers.
+
+        Returns:
+            Dictionary mapping project names to total hours worked
+        """
+        project_times = {}
+
+        # Get all timers, excluding break timers
+        all_timers = self.db_service.get_timers()
+        work_timers = [
+            timer
+            for timer in all_timers
+            if timer.end
+            and (
+                timer.type != "pomodoro"
+                or (timer.type == "pomodoro" and timer.pomodoro_session_type == "work")
+            )
+        ]
+
+        # Get all tasks with their project info
+        all_tasks = self.db_service.get_tasks()
+        all_projects = self.db_service.get_projects()
+
+        # Create task to project mapping
+        task_project = {}
+        project_names = {p.id: p.name for p in all_projects}
+
+        for task in all_tasks:
+            task_project[task.id] = task.project_id
+
+        # Calculate time per project
+        for timer in work_timers:
+            if timer.task_id in task_project:
+                project_id = task_project[timer.task_id]
+                project_name = project_names.get(project_id, f"Project {project_id}")
+
+                timer_hours = (timer.end - timer.start).total_seconds() / 3600
+                project_times[project_name] = (
+                    project_times.get(project_name, 0) + timer_hours
+                )
+
+        return project_times
