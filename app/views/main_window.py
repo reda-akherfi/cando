@@ -1306,6 +1306,25 @@ class MainWindow(QMainWindow):
             QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
                 background-color: transparent;
             }}
+            
+            /* Fix selected item background color for better contrast in dark mode */
+            QListWidget::item:selected {{
+                background-color: #2d2d30;
+                border: 2px solid #0078d4;
+                border-radius: 4px;
+            }}
+            
+            QListWidget::item:selected:active {{
+                background-color: #2d2d30;
+                border: 2px solid #0078d4;
+                border-radius: 4px;
+            }}
+            
+            QListWidget::item:selected:!active {{
+                background-color: #2d2d30;
+                border: 2px solid #0078d4;
+                border-radius: 4px;
+            }}
             """
 
             app.setStyleSheet(stylesheet)
