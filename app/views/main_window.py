@@ -491,6 +491,9 @@ class MainWindow(QMainWindow):
         """Set up the tags tab for managing tags."""
         layout = QVBoxLayout(self.tags_tab)
 
+        # Top controls layout with Add Tag button on the right
+        top_controls_layout = QHBoxLayout()
+
         # Search and sort controls
         controls_layout = QHBoxLayout()
 
@@ -534,7 +537,15 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(sort_label)
         controls_layout.addWidget(self.tag_sort_combo)
 
-        layout.addLayout(controls_layout)
+        # Add Tag button positioned on the right
+        self.add_tag_btn = QPushButton("Add Tag")
+        self.add_tag_btn.clicked.connect(self.add_tag)
+
+        # Add controls to top layout with Add Tag button on the right
+        top_controls_layout.addLayout(controls_layout)
+        top_controls_layout.addWidget(self.add_tag_btn)
+
+        layout.addLayout(top_controls_layout)
 
         # Tag search results counter
         self.tag_search_results_label = QLabel("")
@@ -547,11 +558,6 @@ class MainWindow(QMainWindow):
         self.tag_list_widget.tag_delete_requested.connect(self.delete_tag)
         self.tag_list_widget.tag_selected.connect(self.on_tag_selected)
         layout.addWidget(self.tag_list_widget)
-
-        # Add new tag button
-        self.add_tag_btn = QPushButton("Add Tag")
-        self.add_tag_btn.clicked.connect(self.add_tag)
-        layout.addWidget(self.add_tag_btn)
 
     def toggle_theme(self):
         """Toggle between light and dark themes."""
