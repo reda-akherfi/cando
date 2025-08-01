@@ -194,7 +194,7 @@ class TagListWidget(QListWidget):
         size_hint = item_widget.sizeHint()
 
         # Ensure minimum height for readability
-        min_height = 60  # Minimum height in pixels for tags
+        min_height = 72  # Minimum height in pixels for tags (20% taller than before)
         if size_hint.height() < min_height:
             size_hint.setHeight(min_height)
 
