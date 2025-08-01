@@ -323,8 +323,12 @@ class MainWindow(QMainWindow):
         # Action buttons
         self.add_project_btn = QPushButton("+")
         self.add_project_btn.clicked.connect(self.add_project)
-        self.add_project_btn.setMaximumWidth(40)
+        self.add_project_btn.setMaximumWidth(
+            50
+        )  # Slightly larger to accommodate bigger + sign
         self.add_project_btn.setToolTip("Add Project")
+        # Make the + sign larger using inline stylesheet to override global styles
+        self.add_project_btn.setStyleSheet("font-size: 24px; font-weight: bold;")
 
         controls_layout.addWidget(self.add_project_btn)
 
@@ -420,9 +424,13 @@ class MainWindow(QMainWindow):
         # Add task button
         self.add_task_btn = QPushButton("+")
         self.add_task_btn.clicked.connect(self.add_task)
-        self.add_task_btn.setMaximumWidth(40)
+        self.add_task_btn.setMaximumWidth(
+            50
+        )  # Slightly larger to accommodate bigger + sign
         self.add_task_btn.setToolTip("Add Task")
         self.add_task_btn.setEnabled(False)  # Disabled until project is selected
+        # Make the + sign larger using inline stylesheet to override global styles
+        self.add_task_btn.setStyleSheet("font-size: 24px; font-weight: bold;")
 
         task_controls_layout.addWidget(self.add_task_btn)
 
