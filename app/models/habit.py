@@ -144,8 +144,8 @@ class Habit:
 
     def get_streak_days(self) -> int:
         """Calculate current streak of completed days."""
-        streak = 0
-        current_date = date.today()
+        if not self.recent_entries:
+            return 0
 
         # Group entries by date and calculate daily totals
         daily_totals = {}
@@ -157,35 +157,70 @@ class Habit:
         # Sort dates in descending order
         sorted_dates = sorted(daily_totals.keys(), reverse=True)
 
+        # For daily habits, we need consecutive days starting from today
+        if self.frequency == HabitFrequency.DAILY:
+            return self._calculate_daily_streak(daily_totals, sorted_dates)
+        else:
+            # For weekly/monthly/custom, use the original logic but with proper frequency checking
+            return self._calculate_frequency_streak(daily_totals, sorted_dates)
+
+    def _calculate_daily_streak(self, daily_totals: dict, sorted_dates: list) -> int:
+        """Calculate streak for daily habits - must be consecutive days."""
+        streak = 0
+        current_date = date.today()
+
+        # Start from today and work backwards
+        check_date = current_date
+
+        while check_date in daily_totals:
+            entries_for_day = daily_totals[check_date]
+
+            # Check if this day was completed
+            if self._is_day_completed(entries_for_day):
+                streak += 1
+                check_date -= timedelta(days=1)  # Move to previous day
+            else:
+                break  # Streak broken
+
+        return streak
+
+    def _calculate_frequency_streak(
+        self, daily_totals: dict, sorted_dates: list
+    ) -> int:
+        """Calculate streak for weekly/monthly/custom frequency habits."""
+        streak = 0
+        current_date = date.today()
+
+        # For non-daily habits, check if the required frequency is met
         for entry_date in sorted_dates:
             if entry_date <= current_date:
                 entries_for_day = daily_totals[entry_date]
 
-                # Calculate the total value for this day
-                if self.habit_type == HabitType.BOOLEAN:
-                    # For boolean habits, check if any entry is True
-                    day_completed = any(bool(entry.value) for entry in entries_for_day)
-                elif self.habit_type == HabitType.RATING:
-                    # For rating habits, use average rating
-                    total_rating = sum(float(entry.value) for entry in entries_for_day)
-                    avg_rating = total_rating / len(entries_for_day)
-                    day_completed = avg_rating >= (
-                        self.target_value or 5
-                    )  # Default to 5 if no target
-                else:
-                    # For numeric habits, sum all values
-                    total_value = sum(float(entry.value) for entry in entries_for_day)
-                    if self.target_value is not None:
-                        day_completed = total_value >= self.target_value
-                    else:
-                        day_completed = True  # Any entry counts as completion
-
-                if day_completed:
+                if self._is_day_completed(entries_for_day):
                     streak += 1
-                    current_date = entry_date - timedelta(days=1)
+                    # For weekly/monthly, we might want to adjust the date calculation
+                    # based on the frequency, but for now just count completed days
                 else:
                     break
             else:
                 break
 
         return streak
+
+    def _is_day_completed(self, entries_for_day: list) -> bool:
+        """Check if a day is completed based on habit type and target."""
+        if self.habit_type == HabitType.BOOLEAN:
+            # For boolean habits, check if any entry is True
+            return any(bool(entry.value) for entry in entries_for_day)
+        elif self.habit_type == HabitType.RATING:
+            # For rating habits, use average rating
+            total_rating = sum(float(entry.value) for entry in entries_for_day)
+            avg_rating = total_rating / len(entries_for_day)
+            return avg_rating >= (self.target_value or 5)  # Default to 5 if no target
+        else:
+            # For numeric habits, sum all values
+            total_value = sum(float(entry.value) for entry in entries_for_day)
+            if self.target_value is not None:
+                return total_value >= self.target_value
+            else:
+                return True  # Any entry counts as completion
