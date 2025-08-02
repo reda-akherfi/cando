@@ -884,6 +884,24 @@ class MainWindow(QMainWindow):
                 border-width: 2px;
             }}
             
+            QTextEdit {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QTextEdit:hover {{
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QTextEdit:focus {{
+                border-color: {colors.get('highlight', '#0078d4')};
+                border-width: 2px;
+            }}
+            
             QComboBox {{
                 background-color: {colors.get('base', '#2d2d30')};
                 color: {colors.get('text', '#cccccc')};
@@ -1148,6 +1166,49 @@ class MainWindow(QMainWindow):
             QSpinBox:focus {{
                 border-color: {colors.get('highlight', '#0078d4')};
                 border-width: 2px;
+            }}
+            
+            QDoubleSpinBox {{
+                background-color: {colors.get('base', '#2d2d30')};
+                color: {colors.get('text', '#cccccc')};
+                border: 1px solid {colors.get('light', '#4c4c4c')};
+                border-radius: {spacing.get('border_radius', 4)}px;
+                padding: {spacing.get('margin', 4)}px;
+                font-size: {fonts.get('base_size', 14)}px;
+            }}
+            
+            QDoubleSpinBox:hover {{
+                border-color: {colors.get('highlight', '#0078d4')};
+            }}
+            
+            QDoubleSpinBox:focus {{
+                border-color: {colors.get('highlight', '#0078d4')};
+                border-width: 2px;
+            }}
+            
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+                background-color: {colors.get('button', '#3c3c3c')};
+                border: 1px solid {colors.get('mid', '#2d2d30')};
+                border-radius: 2px;
+                width: 16px;
+            }}
+            
+            QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {{
+                background-color: {colors.get('light', '#4c4c4c')};
+            }}
+            
+            QDoubleSpinBox::up-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 4px solid {colors.get('text', '#cccccc')};
+            }}
+            
+            QDoubleSpinBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 4px solid {colors.get('text', '#cccccc')};
             }}
             
             QSpinBox::up-button {{
