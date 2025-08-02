@@ -147,22 +147,44 @@ class Habit:
         streak = 0
         current_date = date.today()
 
-        # Sort entries by date in descending order
-        sorted_entries = sorted(self.recent_entries, key=lambda x: x.date, reverse=True)
+        # Group entries by date and calculate daily totals
+        daily_totals = {}
+        for entry in self.recent_entries:
+            if entry.date not in daily_totals:
+                daily_totals[entry.date] = []
+            daily_totals[entry.date].append(entry)
 
-        for entry in sorted_entries:
-            if entry.date <= current_date:
+        # Sort dates in descending order
+        sorted_dates = sorted(daily_totals.keys(), reverse=True)
+
+        for entry_date in sorted_dates:
+            if entry_date <= current_date:
+                entries_for_day = daily_totals[entry_date]
+
+                # Calculate the total value for this day
                 if self.habit_type == HabitType.BOOLEAN:
-                    if not bool(entry.value):
-                        break
-                elif self.target_value is not None:
-                    if entry.value < self.target_value:
-                        break
+                    # For boolean habits, check if any entry is True
+                    day_completed = any(bool(entry.value) for entry in entries_for_day)
+                elif self.habit_type == HabitType.RATING:
+                    # For rating habits, use average rating
+                    total_rating = sum(float(entry.value) for entry in entries_for_day)
+                    avg_rating = total_rating / len(entries_for_day)
+                    day_completed = avg_rating >= (
+                        self.target_value or 5
+                    )  # Default to 5 if no target
                 else:
-                    # Any entry counts as completion
-                    pass
-                streak += 1
-                current_date = entry.date - timedelta(days=1)
+                    # For numeric habits, sum all values
+                    total_value = sum(float(entry.value) for entry in entries_for_day)
+                    if self.target_value is not None:
+                        day_completed = total_value >= self.target_value
+                    else:
+                        day_completed = True  # Any entry counts as completion
+
+                if day_completed:
+                    streak += 1
+                    current_date = entry_date - timedelta(days=1)
+                else:
+                    break
             else:
                 break
 
