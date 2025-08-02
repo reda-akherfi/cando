@@ -25,6 +25,7 @@ from app.models.project import Project
 from app.models.task import Task
 from app.models.tag import Tag
 from app.models.timer import Timer
+from app.models.habit import Habit, HabitEntry, HabitType, HabitFrequency
 
 Base = declarative_base()
 
@@ -124,6 +125,64 @@ class ConfigModel(Base):
     value = Column(String(500), nullable=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class HabitModel(Base):
+    """SQLAlchemy model for habits."""
+
+    __tablename__ = "habits"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    habit_type = Column(
+        String(20), nullable=False
+    )  # duration, units, real_number, boolean, rating, count
+    frequency = Column(String(20), default="daily")  # daily, weekly, monthly, custom
+    custom_interval_days = Column(Integer, nullable=True)
+    target_value = Column(Float, nullable=True)
+    unit = Column(String(50), nullable=True)
+    color = Column(String(7), default="#007bff")  # Hex color
+    active = Column(Boolean, default=True)
+    min_value = Column(Float, nullable=True)
+    max_value = Column(Float, nullable=True)
+    rating_scale = Column(Integer, default=10)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    entries = relationship(
+        "HabitEntryModel", back_populates="habit", cascade="all, delete-orphan"
+    )
+
+
+class HabitEntryModel(Base):
+    """SQLAlchemy model for habit entries."""
+
+    __tablename__ = "habit_entries"
+
+    id = Column(Integer, primary_key=True)
+    habit_id = Column(Integer, ForeignKey("habits.id"), nullable=False)
+    date = Column(DateTime, nullable=False)  # Store as date
+    value = Column(Float, nullable=False)  # Store all values as float for simplicity
+    value_type = Column(String(20), nullable=False)  # float, int, bool, str
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    habit = relationship("HabitModel", back_populates="entries")
+
+
+class HabitTagModel(Base):
+    """SQLAlchemy model for habit tags."""
+
+    __tablename__ = "habit_tags"
+
+    id = Column(Integer, primary_key=True)
+    habit_id = Column(Integer, ForeignKey("habits.id"), nullable=False)
+    tag_name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=func.now())
 
 
 class DatabaseService:
@@ -1275,3 +1334,306 @@ class DatabaseService:
                 "position": "Top-Right",
                 "sound": True,
             }
+
+    # Habit CRUD operations
+    def create_habit(self, **kwargs) -> Habit:
+        """Create a new habit."""
+        # Extract tags from kwargs since they're not part of HabitModel
+        tags = kwargs.pop("tags", [])
+
+        # Convert enum objects to strings for database storage
+        if "habit_type" in kwargs and hasattr(kwargs["habit_type"], "value"):
+            kwargs["habit_type"] = kwargs["habit_type"].value
+        if "frequency" in kwargs and hasattr(kwargs["frequency"], "value"):
+            kwargs["frequency"] = kwargs["frequency"].value
+
+        with self.get_session() as session:
+            db_habit = HabitModel(**kwargs)
+            session.add(db_habit)
+            session.commit()
+            session.refresh(db_habit)
+
+            # Add tags
+            for tag_name in tags:
+                habit_tag = HabitTagModel(habit_id=db_habit.id, tag_name=tag_name)
+                session.add(habit_tag)
+
+            session.commit()
+
+            # Get tags for this habit
+            habit_tags = self._get_habit_tags(session, db_habit.id)
+
+            return self._habit_model_to_dataclass(db_habit, habit_tags)
+
+    def get_habits(self, active_only: bool = True) -> List[Habit]:
+        """Get all habits, optionally filtered by active status."""
+        with self.get_session() as session:
+            query = session.query(HabitModel)
+            if active_only:
+                query = query.filter(HabitModel.active == True)
+
+            db_habits = query.all()
+            habits = []
+
+            for db_habit in db_habits:
+                tags = self._get_habit_tags(session, db_habit.id)
+                habits.append(self._habit_model_to_dataclass(db_habit, tags))
+
+            return habits
+
+    def get_habit(self, habit_id: int) -> Optional[Habit]:
+        """Get a specific habit by ID."""
+        with self.get_session() as session:
+            db_habit = (
+                session.query(HabitModel).filter(HabitModel.id == habit_id).first()
+            )
+            if db_habit:
+                tags = self._get_habit_tags(session, db_habit.id)
+                return self._habit_model_to_dataclass(db_habit, tags)
+            return None
+
+    def update_habit(self, habit_id: int, **kwargs) -> Optional[Habit]:
+        """Update a habit."""
+        # Extract tags from kwargs since they're not part of HabitModel
+        tags = kwargs.pop("tags", None)
+
+        # Convert enum objects to strings for database storage
+        if "habit_type" in kwargs and hasattr(kwargs["habit_type"], "value"):
+            kwargs["habit_type"] = kwargs["habit_type"].value
+        if "frequency" in kwargs and hasattr(kwargs["frequency"], "value"):
+            kwargs["frequency"] = kwargs["frequency"].value
+
+        with self.get_session() as session:
+            db_habit = (
+                session.query(HabitModel).filter(HabitModel.id == habit_id).first()
+            )
+            if db_habit:
+                # Update fields
+                for key, value in kwargs.items():
+                    if hasattr(db_habit, key):
+                        setattr(db_habit, key, value)
+
+                db_habit.updated_at = datetime.now()
+
+                # Update tags if provided
+                if tags is not None:
+                    # Remove existing tags
+                    session.query(HabitTagModel).filter(
+                        HabitTagModel.habit_id == habit_id
+                    ).delete()
+
+                    # Add new tags
+                    for tag_name in tags:
+                        habit_tag = HabitTagModel(habit_id=habit_id, tag_name=tag_name)
+                        session.add(habit_tag)
+
+                session.commit()
+                session.refresh(db_habit)
+
+                # Get updated tags
+                habit_tags = self._get_habit_tags(session, db_habit.id)
+                return self._habit_model_to_dataclass(db_habit, habit_tags)
+            return None
+
+    def delete_habit(self, habit_id: int) -> bool:
+        """Delete a habit and all its entries."""
+        with self.get_session() as session:
+            db_habit = (
+                session.query(HabitModel).filter(HabitModel.id == habit_id).first()
+            )
+            if db_habit:
+                session.delete(db_habit)
+                session.commit()
+                return True
+            return False
+
+    def add_habit_tag(self, habit_id: int, tag_name: str) -> bool:
+        """Add a tag to a habit."""
+        with self.get_session() as session:
+            # Check if tag already exists
+            existing_tag = (
+                session.query(HabitTagModel)
+                .filter(
+                    HabitTagModel.habit_id == habit_id,
+                    HabitTagModel.tag_name == tag_name,
+                )
+                .first()
+            )
+
+            if not existing_tag:
+                habit_tag = HabitTagModel(habit_id=habit_id, tag_name=tag_name)
+                session.add(habit_tag)
+                session.commit()
+                return True
+            return False
+
+    def remove_habit_tag(self, habit_id: int, tag_name: str) -> bool:
+        """Remove a tag from a habit."""
+        with self.get_session() as session:
+            habit_tag = (
+                session.query(HabitTagModel)
+                .filter(
+                    HabitTagModel.habit_id == habit_id,
+                    HabitTagModel.tag_name == tag_name,
+                )
+                .first()
+            )
+
+            if habit_tag:
+                session.delete(habit_tag)
+                session.commit()
+                return True
+            return False
+
+    def create_habit_entry(self, **kwargs) -> HabitEntry:
+        """Create a new habit entry."""
+        with self.get_session() as session:
+            # Convert value to appropriate type for storage
+            value = kwargs.get("value")
+            value_type = type(value).__name__
+
+            # Store all values as float for simplicity
+            if isinstance(value, bool):
+                float_value = 1.0 if value else 0.0
+            elif isinstance(value, str):
+                float_value = (
+                    float(value)
+                    if value.replace(".", "").replace("-", "").isdigit()
+                    else 0.0
+                )
+            else:
+                float_value = float(value) if value is not None else 0.0
+
+            db_entry = HabitEntryModel(
+                habit_id=kwargs["habit_id"],
+                date=kwargs["date"],
+                value=float_value,
+                value_type=value_type,
+                notes=kwargs.get("notes"),
+            )
+            session.add(db_entry)
+            session.commit()
+            session.refresh(db_entry)
+
+            return self._habit_entry_model_to_dataclass(db_entry)
+
+    def get_habit_entries(self, habit_id: int, days: int = 30) -> List[HabitEntry]:
+        """Get habit entries for a specific habit within the last N days."""
+        from datetime import timedelta
+
+        with self.get_session() as session:
+            start_date = datetime.now() - timedelta(days=days)
+
+            db_entries = (
+                session.query(HabitEntryModel)
+                .filter(
+                    HabitEntryModel.habit_id == habit_id,
+                    HabitEntryModel.date >= start_date,
+                )
+                .order_by(HabitEntryModel.date.desc())
+                .all()
+            )
+
+            return [self._habit_entry_model_to_dataclass(entry) for entry in db_entries]
+
+    def get_habit_entry(self, entry_id: int) -> Optional[HabitEntry]:
+        """Get a specific habit entry by ID."""
+        with self.get_session() as session:
+            db_entry = (
+                session.query(HabitEntryModel)
+                .filter(HabitEntryModel.id == entry_id)
+                .first()
+            )
+            if db_entry:
+                return self._habit_entry_model_to_dataclass(db_entry)
+            return None
+
+    def update_habit_entry(self, entry_id: int, **kwargs) -> Optional[HabitEntry]:
+        """Update a habit entry."""
+        with self.get_session() as session:
+            db_entry = (
+                session.query(HabitEntryModel)
+                .filter(HabitEntryModel.id == entry_id)
+                .first()
+            )
+            if db_entry:
+                # Update fields
+                for key, value in kwargs.items():
+                    if hasattr(db_entry, key):
+                        setattr(db_entry, key, value)
+
+                db_entry.updated_at = datetime.now()
+                session.commit()
+                session.refresh(db_entry)
+
+                return self._habit_entry_model_to_dataclass(db_entry)
+            return None
+
+    def delete_habit_entry(self, entry_id: int) -> bool:
+        """Delete a habit entry."""
+        with self.get_session() as session:
+            db_entry = (
+                session.query(HabitEntryModel)
+                .filter(HabitEntryModel.id == entry_id)
+                .first()
+            )
+            if db_entry:
+                session.delete(db_entry)
+                session.commit()
+                return True
+            return False
+
+    def _get_habit_tags(self, session, habit_id: int) -> List[str]:
+        """Get tags for a habit."""
+        db_tags = (
+            session.query(HabitTagModel)
+            .filter(HabitTagModel.habit_id == habit_id)
+            .all()
+        )
+        return [tag.tag_name for tag in db_tags]
+
+    def _habit_model_to_dataclass(self, db_habit: HabitModel, tags: List[str]) -> Habit:
+        """Convert HabitModel to Habit dataclass."""
+        # Get recent entries for this habit
+        recent_entries = self.get_habit_entries(db_habit.id, days=30)
+
+        return Habit(
+            id=db_habit.id,
+            name=db_habit.name,
+            description=db_habit.description,
+            habit_type=HabitType(db_habit.habit_type),
+            frequency=HabitFrequency(db_habit.frequency),
+            custom_interval_days=db_habit.custom_interval_days,
+            target_value=db_habit.target_value,
+            unit=db_habit.unit,
+            color=db_habit.color,
+            active=db_habit.active,
+            min_value=db_habit.min_value,
+            max_value=db_habit.max_value,
+            rating_scale=db_habit.rating_scale,
+            created_at=db_habit.created_at,
+            updated_at=db_habit.updated_at,
+            tags=tags,
+            recent_entries=recent_entries,
+        )
+
+    def _habit_entry_model_to_dataclass(self, db_entry: HabitEntryModel) -> HabitEntry:
+        """Convert HabitEntryModel to HabitEntry dataclass."""
+        # Convert stored float value back to original type
+        value = db_entry.value
+        if db_entry.value_type == "bool":
+            value = bool(db_entry.value)
+        elif db_entry.value_type == "int":
+            value = int(db_entry.value)
+        elif db_entry.value_type == "str":
+            value = str(db_entry.value)
+
+        return HabitEntry(
+            id=db_entry.id,
+            habit_id=db_entry.habit_id,
+            date=db_entry.date.date(),  # Convert datetime to date
+            value=value,
+            notes=db_entry.notes,
+            created_at=db_entry.created_at,
+            updated_at=db_entry.updated_at,
+        )

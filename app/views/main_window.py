@@ -46,10 +46,12 @@ from app.ui.timer_widget import TimerWidget
 from app.ui.notification_widget import NotificationManager
 from app.ui.settings_widget import SettingsWidget
 from app.ui.checklist_filter import ChecklistFilterWidget
+from app.ui.habit_list_widget import HabitListWidget
 from app.ui.ui_main import UiMainWindow
 from app.models.project import Project
 from app.models.task import Task
 from app.models.timer import Timer
+from app.models.habit import Habit, HabitEntry
 from app.services.database import DatabaseService
 from app.services.analytics import AnalyticsService
 from app.controllers.timer_controller import TimerController
@@ -164,6 +166,7 @@ class MainWindow(QMainWindow):
         self.dashboard_tab = QWidget()
         self.projects_tab = QWidget()
         self.tags_tab = QWidget()
+        self.habits_tab = QWidget()
         self.timer_tab = QWidget()
         self.settings_tab = QWidget()
 
@@ -171,6 +174,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.dashboard_tab, "Dashboard")
         self.tab_widget.addTab(self.projects_tab, "Projects")
         self.tab_widget.addTab(self.tags_tab, "Tags")
+        self.tab_widget.addTab(self.habits_tab, "Habits")
         self.tab_widget.addTab(self.timer_tab, "Timer")
         self.tab_widget.addTab(self.settings_tab, "Settings")
 
@@ -178,6 +182,7 @@ class MainWindow(QMainWindow):
         self.setup_dashboard_tab()
         self.setup_projects_tab()
         self.setup_tags_tab()
+        self.setup_habits_tab()
         self.setup_timer_tab()
         self.setup_settings_tab()
 
@@ -562,6 +567,21 @@ class MainWindow(QMainWindow):
         self.tag_list_widget.tag_delete_requested.connect(self.delete_tag)
         self.tag_list_widget.tag_selected.connect(self.on_tag_selected)
         layout.addWidget(self.tag_list_widget)
+
+    def setup_habits_tab(self):
+        """Set up the habits tab for managing habits."""
+        layout = QVBoxLayout(self.habits_tab)
+
+        # Habit list widget
+        self.habit_list_widget = HabitListWidget()
+        self.habit_list_widget.habit_created.connect(self.on_habit_created)
+        self.habit_list_widget.habit_updated.connect(self.on_habit_updated)
+        self.habit_list_widget.habit_deleted.connect(self.on_habit_deleted)
+        self.habit_list_widget.entry_added.connect(self.on_habit_entry_added)
+        layout.addWidget(self.habit_list_widget)
+
+        # Load habits
+        self.refresh_habits()
 
     def toggle_theme(self):
         """Toggle between light and dark themes."""
@@ -1334,6 +1354,7 @@ class MainWindow(QMainWindow):
         self.populate_project_tag_filter()
         self.refresh_charts()
         self.refresh_tags()
+        self.refresh_habits()
 
     def refresh_project_list(self):
         """Refresh the project list display."""
@@ -2152,3 +2173,108 @@ class MainWindow(QMainWindow):
 
         # Combine and return sorted list
         return sorted(list(used_priorities.union(all_possible_priorities)))
+
+    # Habit-related methods
+    def refresh_habits(self):
+        """Refresh the habits list."""
+        habits = self.db_service.get_habits()
+        self.habit_list_widget.set_habits(habits)
+
+    def on_habit_created(self, habit: Habit):
+        """Handle habit creation."""
+        # Create habit in database
+        created_habit = self.db_service.create_habit(
+            name=habit.name,
+            description=habit.description,
+            habit_type=habit.habit_type.value,
+            frequency=habit.frequency.value,
+            custom_interval_days=habit.custom_interval_days,
+            target_value=habit.target_value,
+            unit=habit.unit,
+            color=habit.color,
+            active=habit.active,
+            min_value=habit.min_value,
+            max_value=habit.max_value,
+            rating_scale=habit.rating_scale,
+            tags=habit.tags,
+        )
+
+        if created_habit:
+            # Add to list widget
+            self.habit_list_widget.add_habit_to_list(created_habit)
+            self.notification_manager.show_success(
+                "Habit Created", f"Habit '{habit.name}' created successfully!"
+            )
+        else:
+            self.notification_manager.show_error(
+                "Creation Failed", f"Failed to create habit '{habit.name}'."
+            )
+
+    def on_habit_updated(self, habit: Habit):
+        """Handle habit update."""
+        # Update habit in database
+        updated_habit = self.db_service.update_habit(
+            habit.id,
+            name=habit.name,
+            description=habit.description,
+            habit_type=habit.habit_type.value,
+            frequency=habit.frequency.value,
+            custom_interval_days=habit.custom_interval_days,
+            target_value=habit.target_value,
+            unit=habit.unit,
+            color=habit.color,
+            active=habit.active,
+            min_value=habit.min_value,
+            max_value=habit.max_value,
+            rating_scale=habit.rating_scale,
+            tags=habit.tags,
+        )
+
+        if updated_habit:
+            # Update in list widget
+            self.habit_list_widget.update_habit_in_list(updated_habit)
+            self.notification_manager.show_success(
+                "Habit Updated", f"Habit '{habit.name}' updated successfully!"
+            )
+        else:
+            self.notification_manager.show_error(
+                "Update Failed", f"Failed to update habit '{habit.name}'."
+            )
+
+    def on_habit_deleted(self, habit_id: int):
+        """Handle habit deletion."""
+        # Delete habit from database
+        if self.db_service.delete_habit(habit_id):
+            # Remove from list widget
+            self.habit_list_widget.remove_habit_from_list(habit_id)
+            self.notification_manager.show_success(
+                "Habit Deleted", "Habit deleted successfully!"
+            )
+        else:
+            self.notification_manager.show_error(
+                "Deletion Failed", "Failed to delete habit."
+            )
+
+    def on_habit_entry_added(self, habit: Habit, entry: HabitEntry):
+        """Handle habit entry addition."""
+        # Create entry in database
+        created_entry = self.db_service.create_habit_entry(
+            habit_id=entry.habit_id,
+            date=entry.date,
+            value=entry.value,
+            notes=entry.notes,
+        )
+
+        if created_entry:
+            # Refresh the habit to get updated data
+            updated_habit = self.db_service.get_habit(habit.id)
+            if updated_habit:
+                self.habit_list_widget.update_habit_in_list(updated_habit)
+
+            self.notification_manager.show_success(
+                "Entry Added", f"Entry added to '{habit.name}' successfully!"
+            )
+        else:
+            self.notification_manager.show_error(
+                "Entry Failed", f"Failed to add entry to '{habit.name}'."
+            )
