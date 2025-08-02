@@ -189,9 +189,15 @@ class HabitItemWidget(QWidget):
         dialog = HabitEntryDialog(self.habit, self)
         if dialog.exec() == QDialog.Accepted:
             entry = dialog.get_entry()
+            print(f"DEBUG: Dialog accepted, entry: {entry}")
             if entry:
+                print(
+                    f"DEBUG: Emitting entry_added signal with habit: {self.habit.name}, entry value: {entry.value}"
+                )
                 self.entry_added.emit(self.habit, entry)
                 self.update_display()
+            else:
+                print("DEBUG: Entry is None, not emitting signal")
 
     def quick_add_entry(self, value: Union[bool, int, float]):
         """Quickly add an entry with the given value."""

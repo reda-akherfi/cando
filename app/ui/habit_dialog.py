@@ -153,7 +153,8 @@ class HabitDialog(QDialog):
 
         self.target_value_spin = QDoubleSpinBox()
         self.target_value_spin.setRange(0, 999999)
-        self.target_value_spin.setDecimals(2)
+        self.target_value_spin.setDecimals(4)  # Allow up to 4 decimal places
+        self.target_value_spin.setSingleStep(0.01)  # Step by 0.01 for easier navigation
         target_layout.addRow("Target value:", self.target_value_spin)
 
         self.unit_edit = QLineEdit()
@@ -168,12 +169,14 @@ class HabitDialog(QDialog):
 
         self.min_value_spin = QDoubleSpinBox()
         self.min_value_spin.setRange(-999999, 999999)
-        self.min_value_spin.setDecimals(2)
+        self.min_value_spin.setDecimals(4)  # Allow up to 4 decimal places
+        self.min_value_spin.setSingleStep(0.01)  # Step by 0.01 for easier navigation
         range_layout.addRow("Minimum value:", self.min_value_spin)
 
         self.max_value_spin = QDoubleSpinBox()
         self.max_value_spin.setRange(-999999, 999999)
-        self.max_value_spin.setDecimals(2)
+        self.max_value_spin.setDecimals(4)  # Allow up to 4 decimal places
+        self.max_value_spin.setSingleStep(0.01)  # Step by 0.01 for easier navigation
         range_layout.addRow("Maximum value:", self.max_value_spin)
 
         form_layout.addWidget(range_group)
@@ -367,7 +370,11 @@ class HabitDialog(QDialog):
 
         # Get target value
         target_value = self.target_value_spin.value()
-        if target_value == 0:
+        # Only set to None if it's exactly 0 and the user hasn't explicitly set a target
+        # For real number habits, 0.0 might be a valid target
+        if (
+            target_value == 0.0 and self.habit_type_combo.currentIndex() != 3
+        ):  # Not REAL_NUMBER
             target_value = None
 
         # Get unit
@@ -382,6 +389,9 @@ class HabitDialog(QDialog):
 
         max_value = self.max_value_spin.value()
         if max_value == 999999:
+            max_value = None
+        elif max_value == 0.0:
+            # 0.0 is not a reasonable maximum for most habits, treat as no maximum
             max_value = None
 
         # Get rating scale

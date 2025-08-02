@@ -107,24 +107,40 @@ class Habit:
 
     def is_completed_today(self) -> bool:
         """Check if the habit is completed for today."""
-        today = date.today()
-        for entry in self.recent_entries:
-            if entry.date == today:
-                if self.habit_type == HabitType.BOOLEAN:
-                    return bool(entry.value)
-                elif self.target_value is not None:
-                    return entry.value >= self.target_value
-                else:
-                    return True  # Any entry counts as completion
-        return False
+        today_value = self.get_today_value()
+        if today_value is None:
+            return False
+
+        if self.habit_type == HabitType.BOOLEAN:
+            return bool(today_value)
+        elif self.target_value is not None:
+            return today_value >= self.target_value
+        else:
+            return True  # Any entry counts as completion
 
     def get_today_value(self) -> Optional[Union[float, int, bool, str]]:
         """Get today's value for this habit."""
         today = date.today()
-        for entry in self.recent_entries:
-            if entry.date == today:
-                return entry.value
-        return None
+        today_entries = [entry for entry in self.recent_entries if entry.date == today]
+
+        if not today_entries:
+            return None
+
+        if self.habit_type == HabitType.BOOLEAN:
+            # For boolean habits, return True if any entry is True
+            return any(bool(entry.value) for entry in today_entries)
+        elif self.habit_type == HabitType.RATING:
+            # For rating habits, return the average rating
+            total_rating = sum(float(entry.value) for entry in today_entries)
+            return total_rating / len(today_entries)
+        else:
+            # For numeric habits (duration, units, real_number, count), sum all values
+            total_value = sum(float(entry.value) for entry in today_entries)
+            # Return as int for integer types, float for others
+            if self.habit_type in [HabitType.UNITS, HabitType.COUNT]:
+                return int(total_value)
+            else:
+                return total_value
 
     def get_streak_days(self) -> int:
         """Calculate current streak of completed days."""

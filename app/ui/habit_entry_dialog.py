@@ -162,16 +162,11 @@ class HabitEntryDialog(QDialog):
                 widget.setValue(int(self.habit.target_value))
             return widget
         elif self.habit.habit_type == HabitType.REAL_NUMBER:
-            # Float input for real numbers
-            widget = QDoubleSpinBox()
-            widget.setRange(-999999, 999999)
-            widget.setDecimals(2)
-            if self.habit.min_value is not None:
-                widget.setMinimum(self.habit.min_value)
-            if self.habit.max_value is not None:
-                widget.setMaximum(self.habit.max_value)
-            if self.habit.target_value:
-                widget.setValue(self.habit.target_value)
+            # Float input for real numbers - use QLineEdit for better decimal input
+            widget = QLineEdit()
+            widget.setPlaceholderText("Enter decimal value (e.g., 0.75)")
+            # Always start with 0.0 for new entries, not the target value
+            widget.setText("0.0")
             return widget
         elif self.habit.habit_type == HabitType.RATING:
             # Rating scale input
@@ -210,7 +205,11 @@ class HabitEntryDialog(QDialog):
         elif self.habit.habit_type == HabitType.UNITS:
             return self.value_widget.value()
         elif self.habit.habit_type == HabitType.REAL_NUMBER:
-            return self.value_widget.value()
+            try:
+                return float(self.value_widget.text())
+            except ValueError:
+                # If invalid input, return 0.0 as fallback
+                return 0.0
         elif self.habit.habit_type == HabitType.RATING:
             return int(self.value_widget.currentText())
         elif self.habit.habit_type == HabitType.COUNT:
@@ -221,6 +220,7 @@ class HabitEntryDialog(QDialog):
     def get_entry(self) -> Optional[HabitEntry]:
         """Get the habit entry from the dialog."""
         value = self.get_value()
+        print(f"DEBUG: get_entry called with value: {value} (type: {type(value)})")
 
         # Validate value
         if self.habit.habit_type == HabitType.BOOLEAN:
@@ -228,20 +228,41 @@ class HabitEntryDialog(QDialog):
             pass
         elif self.habit.habit_type == HabitType.DURATION:
             if value <= 0:
+                print("DEBUG: Duration validation failed - value <= 0")
                 return None  # Duration must be positive
         elif self.habit.habit_type == HabitType.UNITS:
             if value < 0:
+                print("DEBUG: Units validation failed - value < 0")
                 return None  # Units must be non-negative
         elif self.habit.habit_type == HabitType.REAL_NUMBER:
             # Real numbers can be negative unless constrained
-            pass
+            # Check min/max constraints if set
+            if self.habit.min_value is not None and value < self.habit.min_value:
+                print(
+                    f"DEBUG: Real number validation failed - value {value} < min {self.habit.min_value}"
+                )
+                return None  # Value below minimum
+            if (
+                self.habit.max_value is not None
+                and self.habit.max_value > 0
+                and value > self.habit.max_value
+            ):
+                print(
+                    f"DEBUG: Real number validation failed - value {value} > max {self.habit.max_value}"
+                )
+                return None  # Value above maximum
         elif self.habit.habit_type == HabitType.RATING:
             if not (1 <= value <= self.habit.rating_scale):
+                print(
+                    f"DEBUG: Rating validation failed - value {value} not in range 1-{self.habit.rating_scale}"
+                )
                 return None  # Rating must be within scale
         elif self.habit.habit_type == HabitType.COUNT:
             if value < 0:
+                print("DEBUG: Count validation failed - value < 0")
                 return None  # Count must be non-negative
 
+        print(f"DEBUG: Validation passed, creating entry with value: {value}")
         return HabitEntry(
             id=0,  # Will be set by database
             habit_id=self.habit.id,
