@@ -5,6 +5,7 @@ This module provides SQLAlchemy ORM models and database operations
 for the productivity application.
 """
 
+import logging
 from datetime import datetime
 from typing import List, Optional, Tuple
 from sqlalchemy import (
@@ -189,16 +190,24 @@ class DatabaseService:
     """Service class for database operations."""
 
     def __init__(self, db_url: str = "sqlite:///cando.db"):
-        """Initialize database service."""
-        self.engine = create_engine(db_url, echo=False)
-        Base.metadata.create_all(self.engine)
-        self.SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=self.engine
-        )
+        """Initialize the database service."""
+        try:
+            logging.info(f"Initializing database with URL: {db_url}")
+            self.engine = create_engine(db_url, echo=False)
+            self.Session = sessionmaker(bind=self.engine)
+
+            # Create all tables
+            logging.info("Creating database tables...")
+            Base.metadata.create_all(self.engine)
+            logging.info("Database initialization completed successfully")
+
+        except Exception as e:
+            logging.error(f"Failed to initialize database: {e}", exc_info=True)
+            raise
 
     def get_session(self):
         """Get database session."""
-        return self.SessionLocal()
+        return self.Session()
 
     # Project CRUD operations
     def create_project(self, **kwargs) -> Project:

@@ -1,0 +1,11 @@
+# Build dependencies for creating lightweight Windows executable
+pyinstaller>=5.13.0
+pyinstaller-hooks-contrib>=2023.0
+
+# Optional: UPX for additional compression (if available)
+# upx>=4.0.0
+
+# Core application dependencies (minimal set for build)
+PySide6>=6.5.0
+matplotlib>=3.7.0
+sqlalchemy>=2.0.0 

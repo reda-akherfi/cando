@@ -37,6 +37,11 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+!Cando.spec  # Keep our main spec file
+
+# Build outputs
+install.bat  # Generated installer
+Cando.log    # Runtime logs
 
 # Installer logs
 pip-log.txt
